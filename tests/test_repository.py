@@ -282,7 +282,7 @@ class RepositoryTests(unittest.TestCase):
             "lark-cli config init --new",
             "lark-cli profile list",
             "lark-cli auth status --json --verify",
-            "lark-cli whoami --json",
+            "lark-cli whoami",
             "lark-cli doctor --offline",
         ):
             self.assertIn(command, text)
@@ -292,6 +292,21 @@ class RepositoryTests(unittest.TestCase):
         )
         self.assertNotIn("storage" + ".json", text)
         self.assertNotIn("api" + ".trae", text)
+
+    def test_setup_skill_uses_supported_identity_command(self):
+        """Identity verification must not attach an unsupported JSON output flag."""
+        paths = (
+            "plugins/codex-feishu/skills/feishu-setup/SKILL.md",
+            "plugins/codex-feishu/skills/feishu-setup/references/troubleshooting.md",
+        )
+        skill, reference = (read(path) for path in paths)
+        text = "\n".join((skill, reference))
+
+        self.assertRegex(skill, r"(?m)^\s*lark-cli whoami\s*$")
+        self.assertIn("`lark-cli whoami`", reference)
+        self.assertNotRegex(text, r"(?<![a-z-])whoami\s+--json\b")
+        self.assertIn("`lark-cli whoami` already emits JSON", text)
+        self.assertIn("installed command help is authoritative", text)
 
     def test_setup_skill_metadata_uses_public_namespace(self):
         """The invocation prompt must name the plugin's public skill namespace."""
@@ -410,7 +425,7 @@ class RepositoryTests(unittest.TestCase):
             "lark-cli config init --new",
             "lark-cli auth login",
             "lark-cli auth status --json --verify",
-            "lark-cli whoami --json",
+            "lark-cli whoami",
         ):
             self.assertIn(command, examples)
 

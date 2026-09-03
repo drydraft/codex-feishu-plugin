@@ -43,10 +43,10 @@ If a command is absent or its flags differ, inspect its installed help and `lark
    ```text
    lark-cli profile list
    lark-cli auth status --json --verify
-   lark-cli whoami --json
+   lark-cli whoami
    ```
 
-Treat this verification as read-only, but it may contact Feishu to validate the current login. Static checks and CI must stop before configuration, authentication, or any remote API call.
+For the tested `lark-cli 1.0.93`, `lark-cli whoami` already emits JSON; do not add a JSON flag. The installed command help is authoritative if a different runtime version behaves differently. Treat this verification as read-only, but it may contact Feishu to validate the current login. Static checks and CI must stop before configuration, authentication, or any remote API call.
 
 ## Diagnose before changing anything
 
