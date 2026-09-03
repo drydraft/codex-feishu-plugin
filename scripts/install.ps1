@@ -36,8 +36,14 @@ if (-not (Get-Command -Name $larkCliCommand -ErrorAction SilentlyContinue)) {
 Require-Command -Name $larkCliCommand
 Invoke-Checked -Command $larkCliCommand -Arguments @("--version")
 
-$marketplaces = Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "list")
-$marketplaceRegistered = $marketplaces | Select-String -Quiet -Pattern "^\s*codex-feishu(?:\s|$)"
+$marketplacesJson = Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "list", "--json")
+try {
+    $marketplaces = $marketplacesJson | ConvertFrom-Json -ErrorAction Stop
+}
+catch {
+    throw "Codex returned invalid marketplace JSON: $($_.Exception.Message)"
+}
+$marketplaceRegistered = @($marketplaces.marketplaces).Where({ $_.name -eq "codex-feishu" }).Count -gt 0
 if (-not $marketplaceRegistered) {
     # Argument arrays invoke: codex plugin marketplace add <repository root>.
     Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "add", $repositoryRoot)
