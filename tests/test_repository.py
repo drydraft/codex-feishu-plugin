@@ -597,12 +597,13 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(calls.count("codex|plugin add codex-feishu@codex-feishu"), 2)
             self.assert_call_subsequence(
-                calls[:14],
+                calls[:15],
                 [
                     "node|--version",
                     "npx|--version",
                     "git|--version",
                     "codex|--version",
+                    "python|-c ",
                     "npx|@larksuite/cli@latest install",
                     "lark-cli|--version",
                     "codex|plugin marketplace list --json",
@@ -729,12 +730,13 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(calls.count("codex|plugin add codex-feishu@codex-feishu"), 2)
             self.assert_call_subsequence(
-                calls[:15],
+                calls[:16],
                 [
                     "node|--version",
                     "npx|--version",
                     "git|--version",
                     "codex|--version",
+                    "python3|-c ",
                     "npx|@larksuite/cli@latest install",
                     "lark-cli|--version",
                     "codex|plugin marketplace list --json",
@@ -791,7 +793,8 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn("codex|plugin marketplace list --json", calls)
             self.assertFalse(any("plugin marketplace add" in call for call in calls))
             self.assertFalse(any("plugin add codex-feishu" in call for call in calls))
-            self.assertFalse(any(call.startswith("python|") for call in calls))
+            self.assertTrue(calls[4].startswith("python|-c "), calls)
+            self.assertFalse(any(call.startswith("python|-m") for call in calls))
 
     @unittest.skipUnless(POWERSHELL, "PowerShell is required")
     def test_powershell_verifier_stops_after_test_failure(self):
@@ -961,7 +964,7 @@ class RepositoryTests(unittest.TestCase):
             marketplace_add = next(call for call in calls if "plugin marketplace add" in call)
             self.assertIn(str(staged_root), marketplace_add)
             self.assert_call_subsequence(
-                calls[5:9],
+                calls[6:10],
                 [
                     "codex|plugin marketplace list --json",
                     "codex|plugin marketplace remove codex-feishu",
@@ -1020,7 +1023,7 @@ class RepositoryTests(unittest.TestCase):
             marketplace_add = next(call for call in calls if "plugin marketplace add" in call)
             self.assertIn(self.bash_path(staged_root), marketplace_add)
             self.assert_call_subsequence(
-                calls[5:10],
+                calls[6:11],
                 [
                     "codex|plugin marketplace list --json",
                     "python3|-c ",
@@ -1135,3 +1138,114 @@ class RepositoryTests(unittest.TestCase):
             result = subprocess.run(["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in environment.items())}; exec sh {shlex.quote(self.bash_path(REPOSITORY_ROOT / 'scripts' / 'verify.sh'))}"], cwd=REPOSITORY_ROOT, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(call_log.read_text(encoding="utf-8").splitlines(), ["python3|-c import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"])
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    def test_powershell_installer_rejects_old_python_before_mutations(self):
+        """An unsupported Python stops before CLI install, marketplace changes, or plugin add."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            lark_template = self.write_windows_fake(temporary, "lark-template", record_name="lark-cli")
+            for name in ("node", "git"):
+                self.write_windows_fake(fake_bin, name)
+            self.write_windows_fake(fake_bin, "python", 'if "%1"=="-c" exit /b 1')
+            self.write_windows_fake(fake_bin, "npx", 'copy /Y "%LARK_TEMPLATE%" "%FAKE_BIN%\\fake-lark-cli.cmd" >nul')
+            self.write_windows_fake(fake_bin, "codex", 'if "%1"=="plugin" if "%2"=="marketplace" if "%3"=="list" echo {"marketplaces":[]}')
+            environment = os.environ.copy()
+            for key in tuple(environment):
+                if key.lower() == "path":
+                    del environment[key]
+            environment.update({"PATH": f"{fake_bin}{os.pathsep}C:\\Windows\\System32", "CALL_LOG": str(call_log), "FAKE_BIN": str(fake_bin), "LARK_TEMPLATE": str(lark_template), "LARK_CLI_COMMAND": "fake-lark-cli", "CODEX_PLUGIN_VALIDATOR": str(temporary / "validator.py")})
+            result = subprocess.run([POWERSHELL, "-NoProfile", "-File", str(REPOSITORY_ROOT / "scripts" / "install.ps1")], cwd=REPOSITORY_ROOT, env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python 3.9 or newer is required", result.stderr + result.stdout)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            self.assertFalse(any(call.startswith("npx|@larksuite/cli@latest install") for call in calls))
+            self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call or "plugin add codex-feishu" in call for call in calls))
+            self.assertFalse(any(call.startswith("lark-cli|") for call in calls))
+
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    def test_shell_installer_rejects_old_python_before_mutations(self):
+        """The POSIX installer guards Python before any mutating CLI command."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            lark_template = self.write_posix_fake(temporary, "lark-template", record_name="lark-cli")
+            for name in ("node", "git"):
+                self.write_posix_fake(fake_bin, name)
+            self.write_posix_fake(fake_bin, "python3", 'if [ "$1" = "-c" ]; then exit 1; fi')
+            self.write_posix_fake(fake_bin, "npx", 'cp "$LARK_TEMPLATE" "$FAKE_BIN/fake-lark-cli"\nchmod +x "$FAKE_BIN/fake-lark-cli"')
+            self.write_posix_fake(fake_bin, "codex", 'if [ "$1 $2 $3" = "plugin marketplace list" ]; then printf \'%s\\n\' \'{"marketplaces":[]}\'; fi')
+            if os.name == "nt":
+                subprocess.run(["bash", "-lc", f"chmod +x {shlex.quote(self.bash_path(fake_bin))}/*"], check=True)
+            environment = {"PATH": f"{self.bash_path(fake_bin)}:/usr/local/bin:/usr/bin:/bin", "CALL_LOG": self.bash_path(call_log), "FAKE_BIN": self.bash_path(fake_bin), "LARK_TEMPLATE": self.bash_path(lark_template), "LARK_CLI_COMMAND": "fake-lark-cli", "CODEX_PLUGIN_VALIDATOR": self.bash_path(temporary / "validator.py")}
+            result = subprocess.run(["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in environment.items())}; exec sh {shlex.quote(self.bash_path(REPOSITORY_ROOT / 'scripts' / 'install.sh'))}"], cwd=REPOSITORY_ROOT, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python 3.9 or newer is required", result.stderr + result.stdout)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            self.assertFalse(any(call.startswith("npx|@larksuite/cli@latest install") for call in calls))
+            self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call or "plugin add codex-feishu" in call for call in calls))
+            self.assertFalse(any(call.startswith("lark-cli|") for call in calls))
+
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    def test_shell_installer_uses_real_python_to_compare_marketplace_roots(self):
+        """The embedded JSON comparator handles same, stale, missing, and malformed roots."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            staged_root = temporary / "repository with spaces"
+            (staged_root / "scripts").mkdir(parents=True)
+            shutil.copy2(REPOSITORY_ROOT / "scripts" / "install.sh", staged_root / "scripts" / "install.sh")
+            with (staged_root / "scripts" / "verify.sh").open("w", encoding="utf-8", newline="\n") as file:
+                file.write('#!/bin/sh\nprintf "verify|%s\\n" "$*" >> "$CALL_LOG"\n')
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            for name in ("node", "npx", "git"):
+                self.write_posix_fake(fake_bin, name)
+            self.write_posix_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            self.write_posix_fake(
+                fake_bin,
+                "codex",
+                'if [ "$1 $2 $3" = "plugin marketplace list" ]; then\n'
+                '  printf \'%s\\n\' "$MARKETPLACE_JSON"\n'
+                'fi',
+            )
+            if os.name == "nt":
+                subprocess.run(["bash", "-lc", f"chmod +x {shlex.quote(self.bash_path(fake_bin))}/*"], check=True)
+
+            def run_case(marketplaces: list[dict]) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+                if call_log.exists():
+                    call_log.unlink()
+                environment = {
+                    "PATH": f"{self.bash_path(fake_bin)}:/usr/local/bin:/usr/bin:/bin",
+                    "CALL_LOG": self.bash_path(call_log),
+                    "LARK_CLI_COMMAND": "fake-lark-cli",
+                    "PYTHON": "python3",
+                    "MARKETPLACE_JSON": json.dumps({"marketplaces": marketplaces}),
+                }
+                command = ["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in environment.items())}; exec sh {shlex.quote(self.bash_path(staged_root / 'scripts' / 'install.sh'))}"]
+                result = subprocess.run(command, cwd=staged_root, capture_output=True, text=True)
+                calls = call_log.read_text(encoding="utf-8").splitlines()
+                return result, calls
+
+            staged_path = self.bash_path(staged_root)
+            same_result, same_calls = run_case([{"name": "codex-feishu", "root": staged_path}])
+            self.assertEqual(same_result.returncode, 0, same_result.stderr)
+            self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call for call in same_calls))
+            self.assertIn("codex|plugin add codex-feishu@codex-feishu", same_calls)
+
+            stale_result, stale_calls = run_case([{"name": "codex-feishu", "root": "/stale root"}])
+            self.assertEqual(stale_result.returncode, 0, stale_result.stderr)
+            self.assert_call_subsequence(stale_calls[5:9], ["codex|plugin marketplace list --json", "codex|plugin marketplace remove codex-feishu", "codex|plugin marketplace add ", "codex|plugin add codex-feishu@codex-feishu"])
+
+            missing_result, missing_calls = run_case([{"name": "codex-feishu"}])
+            self.assertEqual(missing_result.returncode, 0, missing_result.stderr)
+            self.assert_call_subsequence(missing_calls[5:9], ["codex|plugin marketplace list --json", "codex|plugin marketplace remove codex-feishu", "codex|plugin marketplace add ", "codex|plugin add codex-feishu@codex-feishu"])
+
+            malformed_result, malformed_calls = run_case([{"name": "codex-feishu", "root": 42}])
+            self.assertNotEqual(malformed_result.returncode, 0)
+            self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call or "plugin add codex-feishu" in call for call in malformed_calls))

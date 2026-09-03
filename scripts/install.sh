@@ -18,6 +18,10 @@ for command_name in node npx git codex; do
     "$command_name" --version
 done
 require_command "$python_command"
+if ! "$python_command" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'; then
+    printf "Python 3.9 or newer is required to run the installer.\n" >&2
+    exit 1
+fi
 
 if ! command -v "$lark_cli_command" >/dev/null 2>&1; then
     npx @larksuite/cli@latest install
@@ -39,8 +43,14 @@ if not matching:
     print("missing")
 else:
     current_root = os.path.realpath(os.path.abspath(sys.argv[1]))
-    marketplace_root = os.path.realpath(os.path.abspath(matching[0].get("root", "")))
-    print("same" if marketplace_root == current_root else "relocate")
+    marketplace_root = matching[0].get("root")
+    if marketplace_root is None or marketplace_root == "":
+        print("relocate")
+    elif not isinstance(marketplace_root, str):
+        raise SystemExit("Marketplace root must be a string")
+    else:
+        marketplace_root = os.path.realpath(os.path.abspath(marketplace_root))
+        print("same" if marketplace_root == current_root else "relocate")
 ' "$repository_root")
 case "$marketplace_action" in
     missing)

@@ -40,6 +40,14 @@ foreach ($command in @("node", "npx", "git", "codex")) {
     Invoke-Checked -Command $command -Arguments @("--version")
 }
 
+Require-Command -Name "python"
+& python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"
+$pythonVersionStatus = $LASTEXITCODE
+if ($pythonVersionStatus -ne 0) {
+    [Console]::Error.WriteLine("Python 3.9 or newer is required to run the installer.")
+    exit $pythonVersionStatus
+}
+
 if (-not (Get-Command -Name $larkCliCommand -ErrorAction SilentlyContinue)) {
     Invoke-Checked -Command "npx" -Arguments @("@larksuite/cli@latest", "install")
 }
