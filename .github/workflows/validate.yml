@@ -1,0 +1,60 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run deterministic repository tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate plugin manifest and bundled skills
+        run: >-
+          python -m unittest
+          tests.test_repository.RepositoryTests.test_plugin_manifest_is_safe_and_versioned
+          tests.test_repository.RepositoryTests.test_setup_skill_requires_safe_oauth_flow
+          tests.test_repository.RepositoryTests.test_router_discovers_runtime_before_business_calls
+          -v
+
+      - name: Parse PowerShell scripts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$null,
+              [ref]$errors
+            ) | Out-Null
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+
+      - name: Check POSIX shell syntax
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash -n scripts/install.sh
+          bash -n scripts/verify.sh

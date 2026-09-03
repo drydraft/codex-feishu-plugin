@@ -245,6 +245,50 @@ class RepositoryTests(unittest.TestCase):
             ):
                 self.assertNotIn(prohibited, text)
 
+    def test_docs_define_interactive_oauth_boundary(self):
+        """Fresh-machine guidance must preserve the interactive credential boundary."""
+        readme = read("README.md")
+        deployment = read("docs/deployment.md")
+
+        for command in (
+            "lark-cli config init --new",
+            "lark-cli auth login",
+            "lark-cli auth status --json --verify",
+            "lark-cli whoami --json",
+        ):
+            self.assertIn(command, deployment)
+        self.assertIn("不会", deployment)
+        self.assertIn("App Secret", deployment)
+        self.assertIn("https://github.com/drydraft/codex-feishu-plugin", readme)
+        for relative_path in (
+            "docs/deployment.md",
+            "scripts/install.ps1",
+            "scripts/install.sh",
+        ):
+            self.assertTrue((REPOSITORY_ROOT / relative_path).is_file(), relative_path)
+
+    def test_workflow_is_read_only_and_cross_platform(self):
+        """CI must statically validate both supported runner families without secrets."""
+        workflow = read(".github/workflows/validate.yml")
+
+        for value in (
+            "contents: read",
+            "windows-latest",
+            "ubuntu-latest",
+            "actions/checkout@",
+            "actions/setup-python@",
+            "python -m unittest discover -s tests -v",
+            "test_plugin_manifest_is_safe_and_versioned",
+            "test_setup_skill_requires_safe_oauth_flow",
+            "test_router_discovers_runtime_before_business_calls",
+            "Parser]::ParseFile",
+            "bash -n scripts/install.sh",
+            "bash -n scripts/verify.sh",
+        ):
+            self.assertIn(value, workflow)
+        self.assertNotIn("secrets.", workflow.lower())
+        self.assertNotIn("auth login", workflow.lower())
+
     def test_installers_use_json_marketplace_discovery(self):
         """Marketplace state is parsed from Codex JSON, never display columns."""
         self.assertIn(
