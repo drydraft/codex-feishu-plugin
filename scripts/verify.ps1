@@ -37,7 +37,12 @@ if (-not $pluginValidator) {
     Write-Host "Codex plugin validator is not installed; skipping the optional external validator."
 }
 
-Invoke-Checked -Command "python" -Arguments @("-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)")
+& python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"
+$pythonVersionStatus = $LASTEXITCODE
+if ($pythonVersionStatus -ne 0) {
+    [Console]::Error.WriteLine("Python 3.9 or newer is required to run repository verification.")
+    exit $pythonVersionStatus
+}
 
 Push-Location $repositoryRoot
 try {

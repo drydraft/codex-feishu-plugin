@@ -1110,8 +1110,9 @@ class RepositoryTests(unittest.TestCase):
                 if key.lower() == "path":
                     del environment[key]
             environment.update({"PATH": f"{fake_bin}{os.pathsep}C:\\Windows\\System32", "CALL_LOG": str(call_log), "LARK_CLI_COMMAND": "fake-lark-cli", "CODEX_PLUGIN_VALIDATOR": str(validator)})
-            result = subprocess.run([POWERSHELL, "-NoProfile", "-File", str(REPOSITORY_ROOT / "scripts" / "verify.ps1")], cwd=REPOSITORY_ROOT, env=environment, capture_output=True, text=True)
+            result = subprocess.run([POWERSHELL, "-NoProfile", "-File", str(REPOSITORY_ROOT / "scripts" / "verify.ps1")], cwd=REPOSITORY_ROOT, env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python 3.9 or newer is required", result.stderr + result.stdout)
             calls = call_log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(calls), 1)
             self.assertTrue(calls[0].startswith("python|-c "))
