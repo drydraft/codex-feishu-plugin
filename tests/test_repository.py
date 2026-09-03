@@ -33,34 +33,14 @@ def supports_windows_powershell_behavior(
 
 
 def supports_posix_shell_behavior(
-    platform_name: str, bash_command: str | None, windows_bash_works: bool
+    platform_name: str, bash_command: str | None
 ) -> bool:
-    """Return whether POSIX shell behavior tests have an executable shell."""
-    return bash_command is not None and (platform_name != "nt" or windows_bash_works)
+    """Return whether POSIX fixture paths can run in the native platform."""
+    return platform_name != "nt" and bash_command is not None
 
 
-def windows_bash_probe_succeeds(bash_command: str | None) -> bool:
-    """Bound the Windows WSL/Git-Bash availability check used only for test gating."""
-    if bash_command is None:
-        return False
-    try:
-        result = subprocess.run(
-            [bash_command, "-lc", "exit 0"],
-            capture_output=True,
-            text=True,
-            timeout=3,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
-
-
-WINDOWS_BASH_WORKS = windows_bash_probe_succeeds(BASH) if os.name == "nt" else False
 HAS_WINDOWS_POWERSHELL_BEHAVIOR = supports_windows_powershell_behavior(os.name, POWERSHELL)
-HAS_POSIX_SHELL_BEHAVIOR = supports_posix_shell_behavior(
-    os.name, BASH, WINDOWS_BASH_WORKS
-)
+HAS_POSIX_SHELL_BEHAVIOR = supports_posix_shell_behavior(os.name, BASH)
 
 
 def load_json(relative_path: str) -> dict:
@@ -264,10 +244,9 @@ class RepositoryTests(unittest.TestCase):
         self.assertTrue(supports_windows_powershell_behavior("nt", "powershell"))
         self.assertFalse(supports_windows_powershell_behavior("posix", "pwsh"))
         self.assertFalse(supports_windows_powershell_behavior("nt", None))
-        self.assertTrue(supports_posix_shell_behavior("posix", "bash", False))
-        self.assertFalse(supports_posix_shell_behavior("nt", "bash", False))
-        self.assertTrue(supports_posix_shell_behavior("nt", "bash", True))
-        self.assertFalse(supports_posix_shell_behavior("nt", None, True))
+        self.assertTrue(supports_posix_shell_behavior("posix", "bash"))
+        self.assertFalse(supports_posix_shell_behavior("nt", "bash"))
+        self.assertFalse(supports_posix_shell_behavior("nt", None))
 
     def write_windows_fake(
         self, directory: Path, name: str, body: str = "", record_name: str | None = None
