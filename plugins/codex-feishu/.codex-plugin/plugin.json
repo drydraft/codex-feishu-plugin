@@ -1,0 +1,32 @@
+{
+  "name": "codex-feishu",
+  "version": "0.1.0",
+  "description": "Route Feishu and Lark work through the official lark-cli runtime.",
+  "author": {
+    "name": "drydraft",
+    "url": "https://github.com/drydraft"
+  },
+  "homepage": "https://github.com/drydraft/codex-feishu-plugin",
+  "repository": "https://github.com/drydraft/codex-feishu-plugin",
+  "license": "MIT",
+  "keywords": [
+    "feishu",
+    "lark",
+    "lark-cli"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Feishu",
+    "shortDescription": "Feishu and Lark workflows through lark-cli.",
+    "longDescription": "Route Feishu and Lark tasks through the official lark-cli runtime and its installed skills.",
+    "developerName": "drydraft",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me work with Feishu using the installed lark-cli."
+    ]
+  }
+}
