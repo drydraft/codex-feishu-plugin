@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feishu Workflow Router"
+  short_description: "Route Feishu tasks through the installed lark-cli runtime"
+  default_prompt: "Use $codex-feishu:feishu-workflow-router to safely route and execute this Feishu task with the installed lark-cli runtime."

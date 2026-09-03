@@ -80,3 +80,67 @@ class RepositoryTests(unittest.TestCase):
             prompt_line,
             '  default_prompt: "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine."',
         )
+
+    def test_router_discovers_runtime_before_business_calls(self):
+        """Router guidance must discover the installed CLI before it operates."""
+        text = read("plugins/codex-feishu/skills/feishu-workflow-router/SKILL.md")
+
+        for value in (
+            "lark-cli skills list",
+            "lark-cli skills read lark-shared",
+            "lark-cli skills read <skill>",
+            "lark-cli schema",
+            "--dry-run",
+            "high-risk-write",
+        ):
+            self.assertIn(value, text)
+
+    def test_router_domain_reference_covers_canonical_domains(self):
+        """The routing table must give every supported domain a runtime route."""
+        reference = read(
+            "plugins/codex-feishu/skills/feishu-workflow-router/"
+            "references/domain-routing.md"
+        )
+        table_rows = {
+            line.split("|")[1].strip()
+            for line in reference.splitlines()
+            if line.startswith("|") and not line.startswith("|-")
+        }
+
+        self.assertTrue(
+            {
+                "docs",
+                "drive",
+                "wiki",
+                "sheets",
+                "base",
+                "slides",
+                "whiteboard",
+                "im",
+                "calendar",
+                "mail",
+                "task",
+                "approval",
+                "attendance",
+                "okr",
+                "meeting",
+                "contact",
+                "event",
+            }.issubset(table_rows)
+        )
+
+    def test_router_metadata_uses_public_namespace(self):
+        """The public invocation prompt must name the router's plugin namespace."""
+        metadata = read(
+            "plugins/codex-feishu/skills/feishu-workflow-router/agents/openai.yaml"
+        )
+        prompt_line = next(
+            line
+            for line in metadata.splitlines()
+            if line.lstrip().startswith("default_prompt:")
+        )
+
+        self.assertEqual(
+            prompt_line,
+            '  default_prompt: "Use $codex-feishu:feishu-workflow-router to safely route and execute this Feishu task with the installed lark-cli runtime."',
+        )
