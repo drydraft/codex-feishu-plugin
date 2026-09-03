@@ -66,3 +66,17 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn("default_prompt:", metadata)
         self.assertNotIn("storage.json", text)
         self.assertNotIn("api.trae", text)
+
+    def test_setup_skill_metadata_uses_public_namespace(self):
+        """The invocation prompt must name the plugin's public skill namespace."""
+        metadata = read("plugins/codex-feishu/skills/feishu-setup/agents/openai.yaml")
+        prompt_line = next(
+            line
+            for line in metadata.splitlines()
+            if line.lstrip().startswith("default_prompt:")
+        )
+
+        self.assertEqual(
+            prompt_line,
+            '  default_prompt: "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine."',
+        )

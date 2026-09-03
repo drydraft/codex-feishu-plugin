@@ -1,4 +1,4 @@
 interface:
   display_name: "Feishu Setup"
   short_description: "Install and diagnose safe Feishu CLI access"
-  default_prompt: "Use $feishu-setup to install and verify Feishu CLI access on this machine."
+  default_prompt: "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine."

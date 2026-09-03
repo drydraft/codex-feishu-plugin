@@ -18,7 +18,14 @@ lark-cli profile list
 lark-cli doctor --offline
 ```
 
-If `lark-cli` is missing, install the official runtime, then open a new shell and repeat the checks:
+If `lark-cli` is missing, first confirm the cross-platform Node.js prerequisites:
+
+```text
+node --version
+npx --version
+```
+
+If either command is missing, install Node.js through its official installation method for this operating system, open a new shell, and repeat the prerequisite checks. Do not assume a version constraint that the current official CLI has not published. When both commands work, install the official runtime, then open a new shell and repeat the discovery checks:
 
 ```text
 npx @larksuite/cli@latest install
