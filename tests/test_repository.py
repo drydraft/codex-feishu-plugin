@@ -402,6 +402,31 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn("plugin marketplace add", text)
             self.assertIn("plugin add codex-feishu@codex-feishu", text)
 
+    def test_posix_scripts_are_checked_out_with_lf_endings(self):
+        """Windows autocrlf must not make /bin/sh read CRLF script lines."""
+        paths = ("scripts/install.sh", "scripts/verify.sh")
+        attributes = subprocess.run(
+            ["git", "check-attr", "eol", "--", *paths],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(attributes.returncode, 0, attributes.stderr)
+        self.assertEqual(
+            attributes.stdout.splitlines(),
+            [f"{path}: eol: lf" for path in paths],
+        )
+        for path in paths:
+            blob = subprocess.run(
+                ["git", "show", f"HEAD:{path}"],
+                cwd=REPOSITORY_ROOT,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(blob.returncode, 0, blob.stderr.decode("utf-8", "replace"))
+            self.assertNotIn(b"\r\n", blob.stdout, path)
+
     def test_verifiers_are_read_only_and_run_required_checks(self):
         """Removing a required safe check or adding auth/business calls is a bug."""
         for path in ("scripts/verify.ps1", "scripts/verify.sh"):
