@@ -86,6 +86,28 @@ sh ./scripts/install.sh
 
 运行 [README](../README.md) 指定的安装器后，`codex plugin list` 应能列出已安装插件。这个检查无需 Codex 账户、OAuth 或飞书访问；它只确认本机 CLI 的插件配置。
 
+### 验证器位置与覆盖
+
+`verify.ps1` 和 `verify.sh` 还会调用 Codex 安装中 plugin-creator 提供的 `validate_plugin.py`。默认位置分别是 `$env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py`（Windows）和 `$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py`（macOS/Linux）。默认路径不是每台机器都必然存在；若找不到，验证脚本会停止并给出可操作的错误，要求提供 `CODEX_PLUGIN_VALIDATOR`，不会跳过插件验证。
+
+在 Windows 上，可先确认默认位置，再将环境变量指向实际验证器后运行验证：
+
+```powershell
+$defaultValidator = "$env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py"
+Test-Path $defaultValidator
+$env:CODEX_PLUGIN_VALIDATOR = "D:\tools\codex\validate_plugin.py"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
+```
+
+在 macOS/Linux 上，先检查默认位置；若本机验证器在其他位置，使用同一环境变量覆盖：
+
+```sh
+test -f "$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
+CODEX_PLUGIN_VALIDATOR="/opt/codex/validate_plugin.py" sh ./scripts/verify.sh
+```
+
+仅在路径实际指向可信的本机 `validate_plugin.py` 时才设置覆盖值；不要下载未知脚本，也不要将验证器路径与任何凭据一起保存到仓库。
+
 ## 4. 更新、卸载与故障排查
 
 更新时在克隆目录执行 `git pull --ff-only`，然后重新运行本平台安装脚本。它不会迁移或共享 OAuth；如 identity 已失效，回到本页的交互式步骤。

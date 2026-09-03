@@ -3,15 +3,19 @@
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
 import tempfile
 import unittest
+from urllib.parse import unquote, urlsplit
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+FENCED_CODE_BLOCK = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
 
 
 def load_json(relative_path: str) -> dict:
@@ -23,6 +27,157 @@ def load_json(relative_path: str) -> dict:
 def read(relative_path: str) -> str:
     """Read a UTF-8 repository file for structural contract checks."""
     return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def markdown_relative_links(relative_path: str) -> list[tuple[str, Path]]:
+    """Resolve local Markdown links and reject paths outside this repository."""
+    source = REPOSITORY_ROOT / relative_path
+    links = []
+    for match in MARKDOWN_LINK.finditer(source.read_text(encoding="utf-8")):
+        target = match.group(1).strip().split(maxsplit=1)[0]
+        parsed = urlsplit(target)
+        if parsed.scheme or parsed.netloc or not parsed.path:
+            continue
+        if parsed.path.startswith(("/", "\\")):
+            raise AssertionError(f"{relative_path} uses an absolute local link: {target}")
+        resolved = (source.parent / unquote(parsed.path)).resolve()
+        try:
+            resolved.relative_to(REPOSITORY_ROOT.resolve())
+        except ValueError as error:
+            raise AssertionError(
+                f"{relative_path} links outside the repository: {target}"
+            ) from error
+        links.append((target, resolved))
+    return links
+
+
+def fenced_code(relative_path: str) -> str:
+    """Return executable examples from Markdown fences without testing prose."""
+    return "\n".join(FENCED_CODE_BLOCK.findall(read(relative_path)))
+
+
+def parse_frontmatter(relative_path: str) -> dict[str, str]:
+    """Parse the flat YAML frontmatter shape used by bundled Agent Skills."""
+    lines = read(relative_path).splitlines()
+    if not lines or lines[0] != "---":
+        raise AssertionError(f"{relative_path} has no opening frontmatter delimiter")
+    try:
+        closing_index = lines.index("---", 1)
+    except ValueError as error:
+        raise AssertionError(f"{relative_path} has no closing frontmatter delimiter") from error
+
+    metadata = {}
+    for line in lines[1:closing_index]:
+        match = re.fullmatch(r"([a-z_]+):\s*(.+)", line)
+        if not match:
+            raise AssertionError(f"Unsupported frontmatter entry in {relative_path}: {line}")
+        key, value = match.groups()
+        if key in metadata:
+            raise AssertionError(f"Duplicate frontmatter key in {relative_path}: {key}")
+        metadata[key] = value
+    return metadata
+
+
+def parse_skill_interface(relative_path: str) -> dict[str, str]:
+    """Parse the repository's small, quoted-string OpenAI skill metadata mapping."""
+    lines = [line for line in read(relative_path).splitlines() if line.strip()]
+    if not lines or lines[0] != "interface:":
+        raise AssertionError(f"{relative_path} must start with an interface mapping")
+
+    metadata = {}
+    for line in lines[1:]:
+        match = re.fullmatch(r'  ([a-z_]+):\s*("(?:[^"\\]|\\.)*")', line)
+        if not match:
+            raise AssertionError(f"Unsupported interface entry in {relative_path}: {line}")
+        key, value = match.groups()
+        if key in metadata:
+            raise AssertionError(f"Duplicate interface key in {relative_path}: {key}")
+        metadata[key] = json.loads(value)
+    return metadata
+
+
+def active_yaml_line(line: str) -> str:
+    """Remove YAML comments from this workflow's scalar-only subset."""
+    return line.split("#", 1)[0].rstrip()
+
+
+def indentation(line: str) -> int:
+    """Return leading-space indentation for the constrained workflow parser."""
+    return len(line) - len(line.lstrip(" "))
+
+
+def parse_validate_workflow() -> dict[str, object]:
+    """Inspect the deliberately small YAML subset used by validate.yml without PyYAML."""
+    raw_lines = read(".github/workflows/validate.yml").splitlines()
+    active_lines = [active_yaml_line(line) for line in raw_lines]
+
+    try:
+        permissions_index = next(
+            index for index, line in enumerate(active_lines) if line == "permissions:"
+        )
+    except StopIteration as error:
+        raise AssertionError("Workflow has no permissions mapping") from error
+    permissions = {}
+    for line in active_lines[permissions_index + 1 :]:
+        if line and indentation(line) == 0:
+            break
+        match = re.fullmatch(r"  ([a-z-]+):\s*(\S+)", line)
+        if match:
+            permissions[match.group(1)] = match.group(2)
+
+    matrix_match = re.search(
+        r"^\s*os:\s*\[([^\]]+)\]\s*$", "\n".join(active_lines), re.MULTILINE
+    )
+    if not matrix_match:
+        raise AssertionError("Workflow has no inline operating-system matrix")
+    matrix_os = [value.strip() for value in matrix_match.group(1).split(",")]
+
+    steps = []
+    step_starts = [
+        index
+        for index, line in enumerate(active_lines)
+        if re.fullmatch(r"\s*- name:\s*.+", line)
+    ]
+    for position, start in enumerate(step_starts):
+        end = step_starts[position + 1] if position + 1 < len(step_starts) else len(raw_lines)
+        raw_step = raw_lines[start:end]
+        active_step = active_lines[start:end]
+        name = active_step[0].split(":", 1)[1].strip()
+        step = {"name": name, "run": "", "with": {}, "uses": None, "uses_line": None, "if": None}
+        for index, line in enumerate(active_step):
+            stripped = line.strip()
+            if stripped.startswith("uses:"):
+                step["uses"] = stripped.split(":", 1)[1].strip()
+                step["uses_line"] = raw_step[index]
+            elif stripped.startswith("if:"):
+                step["if"] = stripped.split(":", 1)[1].strip()
+            elif stripped == "with:":
+                with_indent = indentation(line)
+                for child in active_step[index + 1 :]:
+                    if child.strip() and indentation(child) <= with_indent:
+                        break
+                    match = re.fullmatch(r"\s+([a-z-]+):\s*(\S+)", child)
+                    if match:
+                        step["with"][match.group(1)] = match.group(2)
+            elif re.fullmatch(r"\s*run:\s*[|>][-+]?\s*", line):
+                run_indent = indentation(line)
+                run_lines = []
+                for child in raw_step[index + 1 :]:
+                    if child.strip() and indentation(child) <= run_indent:
+                        break
+                    if not child.lstrip().startswith("#"):
+                        run_lines.append(child.strip())
+                step["run"] = "\n".join(run_lines)
+            elif match := re.fullmatch(r"\s*run:\s*(\S.*)", line):
+                step["run"] = match.group(1)
+        steps.append(step)
+
+    return {
+        "active_text": "\n".join(active_lines),
+        "permissions": permissions,
+        "matrix_os": matrix_os,
+        "steps": steps,
+    }
 
 
 class RepositoryTests(unittest.TestCase):
@@ -115,11 +270,13 @@ class RepositoryTests(unittest.TestCase):
             "plugins/codex-feishu/skills/feishu-setup/references/troubleshooting.md"
         )
         text = read(skill_path)
-        metadata = read(metadata_path)
+        frontmatter = parse_frontmatter(skill_path)
+        metadata = parse_skill_interface(metadata_path)
 
         self.assertTrue((REPOSITORY_ROOT / reference_path).is_file())
-        self.assertIn("name: feishu-setup", text)
-        self.assertIn("description: Use when", text)
+        self.assertEqual(set(frontmatter), {"name", "description"})
+        self.assertEqual(frontmatter["name"], "feishu-setup")
+        self.assertTrue(frontmatter["description"])
         for command in (
             "lark-cli skills list",
             "lark-cli config init --new",
@@ -130,24 +287,21 @@ class RepositoryTests(unittest.TestCase):
         ):
             self.assertIn(command, text)
         self.assertIn("troubleshooting.md", text)
-        self.assertIn("display_name:", metadata)
-        self.assertIn("short_description:", metadata)
-        self.assertIn("default_prompt:", metadata)
+        self.assertEqual(
+            set(metadata), {"display_name", "short_description", "default_prompt"}
+        )
         self.assertNotIn("storage" + ".json", text)
         self.assertNotIn("api" + ".trae", text)
 
     def test_setup_skill_metadata_uses_public_namespace(self):
         """The invocation prompt must name the plugin's public skill namespace."""
-        metadata = read("plugins/codex-feishu/skills/feishu-setup/agents/openai.yaml")
-        prompt_line = next(
-            line
-            for line in metadata.splitlines()
-            if line.lstrip().startswith("default_prompt:")
+        metadata = parse_skill_interface(
+            "plugins/codex-feishu/skills/feishu-setup/agents/openai.yaml"
         )
 
         self.assertEqual(
-            prompt_line,
-            '  default_prompt: "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine."',
+            metadata["default_prompt"],
+            "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine.",
         )
 
     def test_router_discovers_runtime_before_business_calls(self):
@@ -200,18 +354,21 @@ class RepositoryTests(unittest.TestCase):
 
     def test_router_metadata_uses_public_namespace(self):
         """The public invocation prompt must name the router's plugin namespace."""
-        metadata = read(
+        skill_path = "plugins/codex-feishu/skills/feishu-workflow-router/SKILL.md"
+        frontmatter = parse_frontmatter(skill_path)
+        metadata = parse_skill_interface(
             "plugins/codex-feishu/skills/feishu-workflow-router/agents/openai.yaml"
         )
-        prompt_line = next(
-            line
-            for line in metadata.splitlines()
-            if line.lstrip().startswith("default_prompt:")
+        self.assertEqual(set(frontmatter), {"name", "description"})
+        self.assertEqual(frontmatter["name"], "feishu-workflow-router")
+        self.assertTrue(frontmatter["description"])
+        self.assertEqual(
+            set(metadata), {"display_name", "short_description", "default_prompt"}
         )
 
         self.assertEqual(
-            prompt_line,
-            '  default_prompt: "Use $codex-feishu:feishu-workflow-router to safely route and execute this Feishu task with the installed lark-cli runtime."',
+            metadata["default_prompt"],
+            "Use $codex-feishu:feishu-workflow-router to safely route and execute this Feishu task with the installed lark-cli runtime.",
         )
 
     def test_installers_have_no_secret_or_trae_inputs(self):
@@ -246,9 +403,8 @@ class RepositoryTests(unittest.TestCase):
                 self.assertNotIn(prohibited, text)
 
     def test_docs_define_interactive_oauth_boundary(self):
-        """Fresh-machine guidance must preserve the interactive credential boundary."""
-        readme = read("README.md")
-        deployment = read("docs/deployment.md")
+        """Fresh-machine examples must keep OAuth separate from static checks."""
+        examples = fenced_code("docs/deployment.md")
 
         for command in (
             "lark-cli config init --new",
@@ -256,38 +412,57 @@ class RepositoryTests(unittest.TestCase):
             "lark-cli auth status --json --verify",
             "lark-cli whoami --json",
         ):
-            self.assertIn(command, deployment)
-        self.assertIn("不会", deployment)
-        self.assertIn("App Secret", deployment)
-        self.assertIn("https://github.com/drydraft/codex-feishu-plugin", readme)
-        for relative_path in (
-            "docs/deployment.md",
-            "scripts/install.ps1",
-            "scripts/install.sh",
+            self.assertIn(command, examples)
+
+    def test_docs_resolve_every_local_markdown_link_inside_the_repository(self):
+        """Documentation links must neither break nor escape the checkout."""
+        for document in ("README.md", "docs/deployment.md"):
+            links = markdown_relative_links(document)
+            self.assertTrue(links, f"{document} has no local Markdown links")
+            for target, resolved in links:
+                self.assertTrue(resolved.is_file(), f"{document} -> {target}")
+
+    def test_deployment_examples_explain_validator_discovery_and_override(self):
+        """Fresh machines need executable validator-path and override examples."""
+        examples = fenced_code("docs/deployment.md")
+        for example in (
+            "$env:USERPROFILE\\.codex\\skills\\.system\\plugin-creator\\scripts\\validate_plugin.py",
+            "$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py",
+            "$env:CODEX_PLUGIN_VALIDATOR",
+            "CODEX_PLUGIN_VALIDATOR=",
         ):
-            self.assertTrue((REPOSITORY_ROOT / relative_path).is_file(), relative_path)
+            self.assertIn(example, examples)
 
     def test_workflow_is_read_only_and_cross_platform(self):
-        """CI must statically validate both supported runner families without secrets."""
-        workflow = read(".github/workflows/validate.yml")
+        """CI must execute only deterministic checks with least privileges."""
+        workflow = parse_validate_workflow()
+        steps = {step["name"]: step for step in workflow["steps"]}
+        checkout = steps["Check out repository"]
+        setup_python = steps["Set up Python"]
 
-        for value in (
-            "contents: read",
-            "windows-latest",
-            "ubuntu-latest",
-            "actions/checkout@",
-            "actions/setup-python@",
+        self.assertEqual(workflow["permissions"], {"contents": "read"})
+        self.assertEqual(workflow["matrix_os"], ["windows-latest", "ubuntu-latest"])
+        self.assertRegex(checkout["uses"], r"^actions/checkout@[0-9a-f]{40}$")
+        self.assertRegex(checkout["uses_line"], r"#\s+v4\s*$")
+        self.assertEqual(checkout["with"], {"persist-credentials": "false"})
+        self.assertRegex(setup_python["uses"], r"^actions/setup-python@[0-9a-f]{40}$")
+        self.assertRegex(setup_python["uses_line"], r"#\s+v5\s*$")
+
+        runs = "\n".join(step["run"] for step in workflow["steps"])
+        for command in (
             "python -m unittest discover -s tests -v",
             "test_plugin_manifest_is_safe_and_versioned",
             "test_setup_skill_requires_safe_oauth_flow",
             "test_router_discovers_runtime_before_business_calls",
-            "Parser]::ParseFile",
-            "bash -n scripts/install.sh",
-            "bash -n scripts/verify.sh",
         ):
-            self.assertIn(value, workflow)
-        self.assertNotIn("secrets.", workflow.lower())
-        self.assertNotIn("auth login", workflow.lower())
+            self.assertIn(command, runs)
+        self.assertIn("runner.os == 'Windows'", steps["Parse PowerShell scripts"]["if"])
+        self.assertIn("Parser]::ParseFile", steps["Parse PowerShell scripts"]["run"])
+        self.assertIn("runner.os == 'Linux'", steps["Check POSIX shell syntax"]["if"])
+        self.assertIn("bash -n scripts/install.sh", steps["Check POSIX shell syntax"]["run"])
+        self.assertIn("bash -n scripts/verify.sh", steps["Check POSIX shell syntax"]["run"])
+        for prohibited in ("secrets", "auth login", "config init", "lark-cli", "feishu api"):
+            self.assertNotIn(prohibited, workflow["active_text"].lower())
 
     def test_installers_use_json_marketplace_discovery(self):
         """Marketplace state is parsed from Codex JSON, never display columns."""
