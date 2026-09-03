@@ -14,6 +14,11 @@ def load_json(relative_path: str) -> dict:
         return json.load(file)
 
 
+def read(relative_path: str) -> str:
+    """Read a UTF-8 repository file for structural contract checks."""
+    return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+
+
 class RepositoryTests(unittest.TestCase):
     def test_marketplace_points_to_plugin(self):
         market = load_json(".agents/plugins/marketplace.json")
@@ -32,3 +37,32 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(plugin["license"], "MIT")
         self.assertNotIn("mcpServers", plugin)
         self.assertEqual(plugin["skills"], "./skills/")
+
+    def test_setup_skill_requires_safe_oauth_flow(self):
+        """Setup guidance must expose the verified, credential-safe handoff."""
+        skill_path = "plugins/codex-feishu/skills/feishu-setup/SKILL.md"
+        metadata_path = "plugins/codex-feishu/skills/feishu-setup/agents/openai.yaml"
+        reference_path = (
+            "plugins/codex-feishu/skills/feishu-setup/references/troubleshooting.md"
+        )
+        text = read(skill_path)
+        metadata = read(metadata_path)
+
+        self.assertTrue((REPOSITORY_ROOT / reference_path).is_file())
+        self.assertIn("name: feishu-setup", text)
+        self.assertIn("description: Use when", text)
+        for command in (
+            "lark-cli skills list",
+            "lark-cli config init --new",
+            "lark-cli profile list",
+            "lark-cli auth status --json --verify",
+            "lark-cli whoami --json",
+            "lark-cli doctor --offline",
+        ):
+            self.assertIn(command, text)
+        self.assertIn("troubleshooting.md", text)
+        self.assertIn("display_name:", metadata)
+        self.assertIn("short_description:", metadata)
+        self.assertIn("default_prompt:", metadata)
+        self.assertNotIn("storage.json", text)
+        self.assertNotIn("api.trae", text)
