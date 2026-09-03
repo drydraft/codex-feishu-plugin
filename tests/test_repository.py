@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+BASH = shutil.which("bash")
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 FENCED_CODE_BLOCK = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
 MAINTAINED_DOCUMENTS = (
@@ -21,6 +22,44 @@ MAINTAINED_DOCUMENTS = (
     "docs/deployment.md",
     "docs/superpowers/specs/2026-09-03-codex-feishu-plugin-design.md",
     "docs/superpowers/plans/2026-09-03-codex-feishu-plugin.md",
+)
+
+
+def supports_windows_powershell_behavior(
+    platform_name: str, powershell_command: str | None
+) -> bool:
+    """Return whether Windows .cmd-based PowerShell fakes can run."""
+    return platform_name == "nt" and powershell_command is not None
+
+
+def supports_posix_shell_behavior(
+    platform_name: str, bash_command: str | None, windows_bash_works: bool
+) -> bool:
+    """Return whether POSIX shell behavior tests have an executable shell."""
+    return bash_command is not None and (platform_name != "nt" or windows_bash_works)
+
+
+def windows_bash_probe_succeeds(bash_command: str | None) -> bool:
+    """Bound the Windows WSL/Git-Bash availability check used only for test gating."""
+    if bash_command is None:
+        return False
+    try:
+        result = subprocess.run(
+            [bash_command, "-lc", "exit 0"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+WINDOWS_BASH_WORKS = windows_bash_probe_succeeds(BASH) if os.name == "nt" else False
+HAS_WINDOWS_POWERSHELL_BEHAVIOR = supports_windows_powershell_behavior(os.name, POWERSHELL)
+HAS_POSIX_SHELL_BEHAVIOR = supports_posix_shell_behavior(
+    os.name, BASH, WINDOWS_BASH_WORKS
 )
 
 
@@ -219,6 +258,16 @@ class RepositoryTests(unittest.TestCase):
         """A verifier tail that never runs must not satisfy sequence assertions."""
         with self.assertRaises(AssertionError):
             self.assert_call_subsequence(["python|-m unittest"], ["python|", "lark-cli|--version"])
+
+    def test_platform_behavior_capability_predicates(self):
+        """Behavior tests run only where their command shims can execute."""
+        self.assertTrue(supports_windows_powershell_behavior("nt", "powershell"))
+        self.assertFalse(supports_windows_powershell_behavior("posix", "pwsh"))
+        self.assertFalse(supports_windows_powershell_behavior("nt", None))
+        self.assertTrue(supports_posix_shell_behavior("posix", "bash", False))
+        self.assertFalse(supports_posix_shell_behavior("nt", "bash", False))
+        self.assertTrue(supports_posix_shell_behavior("nt", "bash", True))
+        self.assertFalse(supports_posix_shell_behavior("nt", None, True))
 
     def write_windows_fake(
         self, directory: Path, name: str, body: str = "", record_name: str | None = None
@@ -544,7 +593,7 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn("plugin marketplace list --json", read("scripts/install.sh"))
         self.assertIn("json.load", read("scripts/install.sh"))
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_installer_converges_with_isolated_fake_commands(self):
         """A missing CLI is installed once; reruns preserve marketplace state."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -642,7 +691,7 @@ class RepositoryTests(unittest.TestCase):
                 ],
             )
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_installer_converges_with_isolated_fake_commands(self):
         """The POSIX path has the same safe, idempotent observable behavior."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -776,7 +825,7 @@ class RepositoryTests(unittest.TestCase):
                 ],
             )
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_installer_stops_after_marketplace_list_failure(self):
         """A failed marketplace probe must prevent registration, install, and verification."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -821,7 +870,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertTrue(calls[4].startswith("python|-c "), calls)
             self.assertFalse(any(call.startswith("python|-m") for call in calls))
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_verifier_stops_after_test_failure(self):
         """A failed repository test preserves its code and skips validation/runtime checks."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -858,7 +907,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertTrue(calls[0].startswith("python|-c "))
             self.assertEqual(calls[1], "python|-m unittest tests.test_repository")
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_installer_stops_after_marketplace_list_failure(self):
         """The POSIX installer must preserve the failed marketplace probe status."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -903,7 +952,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertFalse(any("plugin add codex-feishu" in call for call in calls))
             self.assertFalse(any(call.startswith("python3|-m") for call in calls))
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_verifier_stops_after_test_failure(self):
         """The POSIX verifier must preserve test failure and skip later checks."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -945,7 +994,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertTrue(calls[0].startswith("python3|-c "))
             self.assertEqual(calls[1], "python3|-m unittest tests.test_repository")
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_installer_replaces_a_stale_marketplace_root(self):
         """A same-name marketplace at another root is removed before current-root install."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -998,7 +1047,7 @@ class RepositoryTests(unittest.TestCase):
                 ],
             )
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_installer_replaces_a_stale_marketplace_root(self):
         """The POSIX installer relocates a same-name marketplace before plugin install."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1058,7 +1107,7 @@ class RepositoryTests(unittest.TestCase):
                 ],
             )
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_verifier_skips_absent_default_validator_but_rejects_missing_override(self):
         """A fresh install skips no validator, while an explicit bad override is fatal."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1091,7 +1140,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(call_log.exists())
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_verifier_skips_absent_default_validator_but_rejects_missing_override(self):
         """The POSIX verifier has the same fresh-install and explicit-override boundary."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1121,7 +1170,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(call_log.exists())
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_verifier_requires_python_39_or_newer(self):
         """An old Python must fail before unit tests, validation, or runtime checks."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1145,7 +1194,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertTrue(calls[0].startswith("python|-c "))
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_verifier_requires_python_39_or_newer(self):
         """The POSIX verifier must reject an old Python before other checks."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1164,7 +1213,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(call_log.read_text(encoding="utf-8").splitlines(), ["python3|-c import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"])
 
-    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    @unittest.skipUnless(HAS_WINDOWS_POWERSHELL_BEHAVIOR, "Windows PowerShell is required")
     def test_powershell_installer_rejects_old_python_before_mutations(self):
         """An unsupported Python stops before CLI install, marketplace changes, or plugin add."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1191,7 +1240,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call or "plugin add codex-feishu" in call for call in calls))
             self.assertFalse(any(call.startswith("lark-cli|") for call in calls))
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_installer_rejects_old_python_before_mutations(self):
         """The POSIX installer guards Python before any mutating CLI command."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
@@ -1216,7 +1265,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertFalse(any("plugin marketplace remove" in call or "plugin marketplace add" in call or "plugin add codex-feishu" in call for call in calls))
             self.assertFalse(any(call.startswith("lark-cli|") for call in calls))
 
-    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    @unittest.skipUnless(HAS_POSIX_SHELL_BEHAVIOR, "A usable POSIX Bash is required")
     def test_shell_installer_uses_real_python_to_compare_marketplace_roots(self):
         """The embedded JSON comparator handles same, stale, missing, and malformed roots."""
         with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
