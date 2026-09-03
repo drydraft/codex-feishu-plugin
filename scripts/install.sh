@@ -28,16 +28,35 @@ require_command "$lark_cli_command"
 "$lark_cli_command" --version
 
 marketplaces_json=$(codex plugin marketplace list --json)
-marketplace_registered=$(printf '%s\n' "$marketplaces_json" | "$python_command" -c '
+marketplace_action=$(printf '%s\n' "$marketplaces_json" | "$python_command" -c '
 import json
+import os
 import sys
 
 marketplaces = json.load(sys.stdin).get("marketplaces", [])
-print("1" if any(item.get("name") == "codex-feishu" for item in marketplaces) else "0")
-')
-if [ "$marketplace_registered" != "1" ]; then
-    codex plugin marketplace add "$repository_root"
-fi
+matching = [item for item in marketplaces if item.get("name") == "codex-feishu"]
+if not matching:
+    print("missing")
+else:
+    current_root = os.path.realpath(os.path.abspath(sys.argv[1]))
+    marketplace_root = os.path.realpath(os.path.abspath(matching[0].get("root", "")))
+    print("same" if marketplace_root == current_root else "relocate")
+' "$repository_root")
+case "$marketplace_action" in
+    missing)
+        codex plugin marketplace add "$repository_root"
+        ;;
+    relocate)
+        codex plugin marketplace remove codex-feishu
+        codex plugin marketplace add "$repository_root"
+        ;;
+    same)
+        ;;
+    *)
+        printf "Could not determine the codex-feishu marketplace state.\n" >&2
+        exit 1
+        ;;
+esac
 
 codex plugin add codex-feishu@codex-feishu
 sh "$script_dir/verify.sh"

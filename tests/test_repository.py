@@ -509,7 +509,7 @@ class RepositoryTests(unittest.TestCase):
                 "codex",
                 'if "%1"=="plugin" if "%2"=="marketplace" if "%3"=="list" (\r\n'
                 '  if exist "%MARKETPLACE_STATE%" (\r\n'
-                '    echo {"marketplaces":[{"name":"codex-feishu"}]}\r\n'
+                '    echo {"marketplaces":[{"name":"codex-feishu","root":"%REPOSITORY_ROOT_JSON%"}]}\r\n'
                 '  ) else (\r\n'
                 '    echo {"marketplaces":[]}\r\n'
                 '  )\r\n'
@@ -538,6 +538,7 @@ class RepositoryTests(unittest.TestCase):
                     "LARK_CLI_COMMAND": "fake-lark-cli",
                     "FAKE_LARK_COMMAND": "fake-lark-cli",
                     "CODEX_PLUGIN_VALIDATOR": str(validator),
+                    "REPOSITORY_ROOT_JSON": REPOSITORY_ROOT.as_posix(),
                 }
             )
             command = [
@@ -565,7 +566,7 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(calls.count("codex|plugin add codex-feishu@codex-feishu"), 2)
             self.assert_call_subsequence(
-                calls[:13],
+                calls[:14],
                 [
                     "node|--version",
                     "npx|--version",
@@ -576,6 +577,7 @@ class RepositoryTests(unittest.TestCase):
                     "codex|plugin marketplace list --json",
                     "codex|plugin marketplace add ",
                     "codex|plugin add codex-feishu@codex-feishu",
+                    "python|-c ",
                     "python|-m unittest tests.test_repository",
                     "python|",
                     "lark-cli|--version",
@@ -601,8 +603,8 @@ class RepositoryTests(unittest.TestCase):
                 body = (
                     'if [ "$1" = "-c" ]; then\n'
                     '  case "$(cat)" in\n'
-                    '    *codex-feishu*) printf "1\\n" ;;\n'
-                    '    *) printf "0\\n" ;;\n'
+                    '    *codex-feishu*) printf "same\\n" ;;\n'
+                    '    *) printf "missing\\n" ;;\n'
                     '  esac\n'
                     'fi'
                     if name == "python3"
@@ -614,7 +616,7 @@ class RepositoryTests(unittest.TestCase):
                 "codex",
                 'if [ "$1 $2 $3" = "plugin marketplace list" ]; then\n'
                 '  if [ -f "$MARKETPLACE_STATE" ]; then\n'
-                '    printf \'%s\\n\' \'{"marketplaces":[{"name":"codex-feishu"}]}\'\n'
+                '    printf \'%s\\n\' \'{"marketplaces":[{"name":"codex-feishu","root":"%s"}]}\' "$REPOSITORY_ROOT_JSON"\n'
                 '  else\n'
                 '    printf \'%s\\n\' \'{"marketplaces":[]}\'\n'
                 '  fi\n'
@@ -656,6 +658,7 @@ class RepositoryTests(unittest.TestCase):
                     "LARK_CLI_COMMAND": "fake-lark-cli",
                     "FAKE_LARK_COMMAND": "fake-lark-cli",
                     "CODEX_PLUGIN_VALIDATOR": self.bash_path(validator),
+                    "REPOSITORY_ROOT_JSON": self.bash_path(REPOSITORY_ROOT),
                 }
             )
             shell_environment = " ".join(
@@ -671,6 +674,7 @@ class RepositoryTests(unittest.TestCase):
                     "LARK_CLI_COMMAND",
                     "FAKE_LARK_COMMAND",
                     "CODEX_PLUGIN_VALIDATOR",
+                    "REPOSITORY_ROOT_JSON",
                 }
             )
             command = [
@@ -694,7 +698,7 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(calls.count("codex|plugin add codex-feishu@codex-feishu"), 2)
             self.assert_call_subsequence(
-                calls[:14],
+                calls[:15],
                 [
                     "node|--version",
                     "npx|--version",
@@ -706,6 +710,7 @@ class RepositoryTests(unittest.TestCase):
                     "python3|-c ",
                     "codex|plugin marketplace add ",
                     "codex|plugin add codex-feishu@codex-feishu",
+                    "python3|-c ",
                     "python3|-m unittest tests.test_repository",
                     "python3|",
                     "lark-cli|--version",
@@ -790,7 +795,9 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 43, result.stderr)
             calls = call_log.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(calls, ["python|-m unittest tests.test_repository"])
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(calls[0].startswith("python|-c "))
+            self.assertEqual(calls[1], "python|-m unittest tests.test_repository")
 
     @unittest.skipUnless(shutil.which("bash"), "Bash is required")
     def test_shell_installer_stops_after_marketplace_list_failure(self):
@@ -875,4 +882,224 @@ class RepositoryTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 43, result.stderr)
             calls = call_log.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(calls, ["python3|-m unittest tests.test_repository"])
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(calls[0].startswith("python3|-c "))
+            self.assertEqual(calls[1], "python3|-m unittest tests.test_repository")
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    def test_powershell_installer_replaces_a_stale_marketplace_root(self):
+        """A same-name marketplace at another root is removed before current-root install."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            staged_root = temporary / "repository with spaces"
+            shutil.copytree(REPOSITORY_ROOT / "scripts", staged_root / "scripts")
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            validator = temporary / "validate_plugin.py"
+            validator.write_text("# fake validator\n", encoding="utf-8")
+            for name in ("node", "npx", "git", "python"):
+                self.write_windows_fake(fake_bin, name, 'if "%1"=="-c" exit /b 0')
+            self.write_windows_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            self.write_windows_fake(
+                fake_bin,
+                "codex",
+                'if "%1"=="plugin" if "%2"=="marketplace" if "%3"=="list" (echo {"marketplaces":[{"name":"codex-feishu","root":"C:/stale root"}]})',
+            )
+            environment = os.environ.copy()
+            for key in tuple(environment):
+                if key.lower() == "path":
+                    del environment[key]
+            environment.update(
+                {
+                    "PATH": f"{fake_bin}{os.pathsep}C:\\Windows\\System32",
+                    "CALL_LOG": str(call_log),
+                    "LARK_CLI_COMMAND": "fake-lark-cli",
+                    "CODEX_PLUGIN_VALIDATOR": str(validator),
+                }
+            )
+            result = subprocess.run(
+                [POWERSHELL, "-NoProfile", "-File", str(staged_root / "scripts" / "install.ps1")],
+                cwd=staged_root,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            marketplace_add = next(call for call in calls if "plugin marketplace add" in call)
+            self.assertIn(str(staged_root), marketplace_add)
+            self.assert_call_subsequence(
+                calls[5:9],
+                [
+                    "codex|plugin marketplace list --json",
+                    "codex|plugin marketplace remove codex-feishu",
+                    "codex|plugin marketplace add ",
+                    "codex|plugin add codex-feishu@codex-feishu",
+                ],
+            )
+
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    def test_shell_installer_replaces_a_stale_marketplace_root(self):
+        """The POSIX installer relocates a same-name marketplace before plugin install."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            staged_root = temporary / "repository with spaces"
+            shutil.copytree(REPOSITORY_ROOT / "scripts", staged_root / "scripts")
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            validator = temporary / "validate_plugin.py"
+            validator.write_text("# fake validator\n", encoding="utf-8")
+            for name in ("node", "npx", "git"):
+                self.write_posix_fake(fake_bin, name)
+            self.write_posix_fake(fake_bin, "python3", 'if [ "$1" = "-c" ]; then printf "relocate\\n"; fi')
+            self.write_posix_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            self.write_posix_fake(
+                fake_bin,
+                "codex",
+                'if [ "$1 $2 $3" = "plugin marketplace list" ]; then\n'
+                '  printf \'%s\\n\' \'{"marketplaces":[{"name":"codex-feishu","root":"/stale root"}]}\'\n'
+                'fi',
+            )
+            if os.name == "nt":
+                subprocess.run(
+                    ["bash", "-lc", f"chmod +x {shlex.quote(self.bash_path(fake_bin))}/*"],
+                    check=True,
+                )
+            environment = {
+                "PATH": f"{self.bash_path(fake_bin)}:/usr/local/bin:/usr/bin:/bin",
+                "CALL_LOG": self.bash_path(call_log),
+                "LARK_CLI_COMMAND": "fake-lark-cli",
+                "CODEX_PLUGIN_VALIDATOR": self.bash_path(validator),
+            }
+            exported = " ".join(f"{key}={shlex.quote(value)}" for key, value in environment.items())
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    f"export {exported}; exec sh {shlex.quote(self.bash_path(staged_root / 'scripts' / 'install.sh'))}",
+                ],
+                cwd=staged_root,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            marketplace_add = next(call for call in calls if "plugin marketplace add" in call)
+            self.assertIn(self.bash_path(staged_root), marketplace_add)
+            self.assert_call_subsequence(
+                calls[5:10],
+                [
+                    "codex|plugin marketplace list --json",
+                    "python3|-c ",
+                    "codex|plugin marketplace remove codex-feishu",
+                    "codex|plugin marketplace add ",
+                    "codex|plugin add codex-feishu@codex-feishu",
+                ],
+            )
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    def test_powershell_verifier_skips_absent_default_validator_but_rejects_missing_override(self):
+        """A fresh install skips no validator, while an explicit bad override is fatal."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            self.write_windows_fake(fake_bin, "python", 'if "%1"=="-c" exit /b 0')
+            self.write_windows_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            base_environment = os.environ.copy()
+            for key in tuple(base_environment):
+                if key.lower() == "path":
+                    del base_environment[key]
+            base_environment.update(
+                {
+                    "PATH": f"{fake_bin}{os.pathsep}C:\\Windows\\System32",
+                    "CALL_LOG": str(call_log),
+                    "USERPROFILE": str(temporary / "fresh-user"),
+                    "LARK_CLI_COMMAND": "fake-lark-cli",
+                }
+            )
+            command = [POWERSHELL, "-NoProfile", "-File", str(REPOSITORY_ROOT / "scripts" / "verify.ps1")]
+            result = subprocess.run(command, cwd=REPOSITORY_ROOT, env=base_environment, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("lark-cli|skills list", call_log.read_text(encoding="utf-8"))
+
+            explicit_environment = {**base_environment, "CODEX_PLUGIN_VALIDATOR": str(temporary / "missing.py")}
+            call_log.unlink()
+            result = subprocess.run(command, cwd=REPOSITORY_ROOT, env=explicit_environment, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(call_log.exists())
+
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    def test_shell_verifier_skips_absent_default_validator_but_rejects_missing_override(self):
+        """The POSIX verifier has the same fresh-install and explicit-override boundary."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            self.write_posix_fake(fake_bin, "python3", 'if [ "$1" = "-c" ]; then exit 0; fi')
+            self.write_posix_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            if os.name == "nt":
+                subprocess.run(["bash", "-lc", f"chmod +x {shlex.quote(self.bash_path(fake_bin))}/*"], check=True)
+            base_environment = {
+                "PATH": f"{self.bash_path(fake_bin)}:/usr/local/bin:/usr/bin:/bin",
+                "CALL_LOG": self.bash_path(call_log),
+                "HOME": self.bash_path(temporary / "fresh-user"),
+                "LARK_CLI_COMMAND": "fake-lark-cli",
+            }
+            command = ["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in base_environment.items())}; exec sh {shlex.quote(self.bash_path(REPOSITORY_ROOT / 'scripts' / 'verify.sh'))}"]
+            result = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("lark-cli|skills list", call_log.read_text(encoding="utf-8"))
+
+            call_log.unlink()
+            explicit_environment = {**base_environment, "CODEX_PLUGIN_VALIDATOR": self.bash_path(temporary / "missing.py")}
+            command = ["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in explicit_environment.items())}; exec sh {shlex.quote(self.bash_path(REPOSITORY_ROOT / 'scripts' / 'verify.sh'))}"]
+            result = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(call_log.exists())
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell is required")
+    def test_powershell_verifier_requires_python_39_or_newer(self):
+        """An old Python must fail before unit tests, validation, or runtime checks."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            validator = temporary / "validator.py"
+            validator.write_text("# fake\n", encoding="utf-8")
+            self.write_windows_fake(fake_bin, "python", 'if "%1"=="-c" exit /b 1')
+            self.write_windows_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            environment = os.environ.copy()
+            for key in tuple(environment):
+                if key.lower() == "path":
+                    del environment[key]
+            environment.update({"PATH": f"{fake_bin}{os.pathsep}C:\\Windows\\System32", "CALL_LOG": str(call_log), "LARK_CLI_COMMAND": "fake-lark-cli", "CODEX_PLUGIN_VALIDATOR": str(validator)})
+            result = subprocess.run([POWERSHELL, "-NoProfile", "-File", str(REPOSITORY_ROOT / "scripts" / "verify.ps1")], cwd=REPOSITORY_ROOT, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(calls[0].startswith("python|-c "))
+
+    @unittest.skipUnless(shutil.which("bash"), "Bash is required")
+    def test_shell_verifier_requires_python_39_or_newer(self):
+        """The POSIX verifier must reject an old Python before other checks."""
+        with tempfile.TemporaryDirectory(dir=REPOSITORY_ROOT) as temporary_directory:
+            temporary = Path(temporary_directory)
+            fake_bin = temporary / "bin"
+            fake_bin.mkdir()
+            call_log = temporary / "calls.log"
+            validator = temporary / "validator.py"
+            validator.write_text("# fake\n", encoding="utf-8")
+            self.write_posix_fake(fake_bin, "python3", 'if [ "$1" = "-c" ]; then exit 1; fi')
+            self.write_posix_fake(fake_bin, "fake-lark-cli", record_name="lark-cli")
+            if os.name == "nt":
+                subprocess.run(["bash", "-lc", f"chmod +x {shlex.quote(self.bash_path(fake_bin))}/*"], check=True)
+            environment = {"PATH": f"{self.bash_path(fake_bin)}:/usr/local/bin:/usr/bin:/bin", "CALL_LOG": self.bash_path(call_log), "LARK_CLI_COMMAND": "fake-lark-cli", "CODEX_PLUGIN_VALIDATOR": self.bash_path(validator)}
+            result = subprocess.run(["bash", "-c", f"export {' '.join(f'{key}={shlex.quote(value)}' for key, value in environment.items())}; exec sh {shlex.quote(self.bash_path(REPOSITORY_ROOT / 'scripts' / 'verify.sh'))}"], cwd=REPOSITORY_ROOT, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(call_log.read_text(encoding="utf-8").splitlines(), ["python3|-c import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"])

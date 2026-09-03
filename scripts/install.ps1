@@ -23,6 +23,18 @@ function Invoke-Checked {
     }
 }
 
+function Normalize-PathForComparison {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    try {
+        $normalizedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+    }
+    catch {
+        $normalizedPath = [IO.Path]::GetFullPath($Path)
+    }
+    return $normalizedPath.TrimEnd([char[]]@('\', '/'))
+}
+
 foreach ($command in @("node", "npx", "git", "codex")) {
     Require-Command -Name $command
     Invoke-Checked -Command $command -Arguments @("--version")
@@ -43,10 +55,29 @@ try {
 catch {
     throw "Codex returned invalid marketplace JSON: $($_.Exception.Message)"
 }
-$marketplaceRegistered = @($marketplaces.marketplaces).Where({ $_.name -eq "codex-feishu" }).Count -gt 0
-if (-not $marketplaceRegistered) {
+$matchingMarketplaces = @($marketplaces.marketplaces).Where({ $_.name -eq "codex-feishu" })
+if ($matchingMarketplaces.Count -eq 0) {
     # Argument arrays invoke: codex plugin marketplace add <repository root>.
     Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "add", $repositoryRoot)
+}
+else {
+    try {
+        $currentRoot = Normalize-PathForComparison -Path $repositoryRoot
+        $marketplaceRoot = Normalize-PathForComparison -Path $matchingMarketplaces[0].root
+        $sameRoot = [String]::Equals(
+            $marketplaceRoot,
+            $currentRoot,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    }
+    catch {
+        $sameRoot = $false
+    }
+
+    if (-not $sameRoot) {
+        Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "remove", "codex-feishu")
+        Invoke-Checked -Command "codex" -Arguments @("plugin", "marketplace", "add", $repositoryRoot)
+    }
 }
 
 # Argument arrays invoke: codex plugin add codex-feishu@codex-feishu.
