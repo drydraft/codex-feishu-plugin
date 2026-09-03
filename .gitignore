@@ -1,0 +1,28 @@
+# Credentials and local Feishu/Lark state
+.env
+.env.*
+!.env.example
+.lark-cli/
+*token*
+*secret*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Node
+node_modules/
+
+# Editors and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Test and local output
+.coverage
+coverage/
+tmp/
+work/
