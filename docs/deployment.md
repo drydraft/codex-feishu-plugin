@@ -11,7 +11,7 @@ git clone https://github.com/drydraft/codex-feishu-plugin.git
 cd codex-feishu-plugin
 ```
 
-需要的本机命令为 `git`、`node`、`npx`、`codex` 和 Python（Windows 为 `python`；macOS/Linux 通常为 `python3`）。安装器会在 `lark-cli` 不存在时运行官方安装入口 `npx @larksuite/cli@latest install`，但不会自动运行配置或登录。
+需要的本机命令为 `git`、`node`、`npx`、`codex` 和 Python（Windows 为 `python`；macOS/Linux 通常为 `python3`）。验证脚本要求 **Python 3.9 或更高版本**；GitHub Actions 使用 Python 3.11。安装器会在 `lark-cli` 不存在时运行官方安装入口 `npx @larksuite/cli@latest install`，但不会自动运行配置或登录。
 
 ## 1. 安装插件
 
@@ -69,10 +69,10 @@ sh ./scripts/install.sh
    ```text
    lark-cli profile list
    lark-cli auth status --json --verify
-   lark-cli whoami --json
+   lark-cli whoami
    ```
 
-   后两项用于验证当前登录，可能连接飞书；它们不属于静态验证或 CI。业务调用前再由插件路由 skill 选择用户或 bot/app 身份，并确认资源共享与 scope。
+   后两项用于验证当前登录，可能连接飞书；它们不属于静态验证或 CI。已安装的 1.0.93 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。业务调用前再由插件路由 skill 选择用户或 bot/app 身份，并确认资源共享与 scope。
 
 ## 3. 无凭据验收清单
 
@@ -88,7 +88,7 @@ sh ./scripts/install.sh
 
 ### 验证器位置与覆盖
 
-`verify.ps1` 和 `verify.sh` 还会调用 Codex 安装中 plugin-creator 提供的 `validate_plugin.py`。默认位置分别是 `$env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py`（Windows）和 `$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py`（macOS/Linux）。默认路径不是每台机器都必然存在；若找不到，验证脚本会停止并给出可操作的错误，要求提供 `CODEX_PLUGIN_VALIDATOR`，不会跳过插件验证。
+`verify.ps1` 和 `verify.sh` 会在存在时调用 Codex 安装中 plugin-creator 提供的 `validate_plugin.py`，作为额外的严格检查。默认位置分别是 `$env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py`（Windows）和 `$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py`（macOS/Linux）。默认路径不是每台机器都必然存在：未设置覆盖且默认路径缺失时，验证器会输出 `Codex plugin validator is not installed; skipping the optional external validator.`，随后继续运行仓库 contract tests。
 
 在 Windows 上，可先确认默认位置，再将环境变量指向实际验证器后运行验证：
 
@@ -106,7 +106,7 @@ test -f "$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
 CODEX_PLUGIN_VALIDATOR="/opt/codex/validate_plugin.py" sh ./scripts/verify.sh
 ```
 
-仅在路径实际指向可信的本机 `validate_plugin.py` 时才设置覆盖值；不要下载未知脚本，也不要将验证器路径与任何凭据一起保存到仓库。
+仅在路径实际指向可信的本机 `validate_plugin.py` 时才设置覆盖值；一旦显式设置 `CODEX_PLUGIN_VALIDATOR`，该路径缺失或该验证器失败都会以非零状态结束验证。不要下载未知脚本，也不要将验证器路径与任何凭据一起保存到仓库。
 
 ## 4. 更新、卸载与故障排查
 

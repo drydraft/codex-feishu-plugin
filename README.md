@@ -28,7 +28,7 @@ Codex 请求
 
 ## 前置条件
 
-安装机器需要能使用 `git`、`node`、`npx`、`python`（或 macOS/Linux 的 `python3`）以及 `codex`。安装脚本会在找不到 `lark-cli` 时调用官方 CLI 安装入口；不会替你创建飞书应用或登录。
+安装机器需要能使用 `git`、`node`、`npx`、`python`（或 macOS/Linux 的 `python3`）以及 `codex`。Python 需为 **Python 3.9 或更高版本**；CI 使用 Python 3.11。安装脚本会在找不到 `lark-cli` 时调用官方 CLI 安装入口；不会替你创建飞书应用或登录。
 
 请先克隆私有仓库，然后按平台执行安装：
 
@@ -44,7 +44,7 @@ cd codex-feishu-plugin
 
 ## 首次认证与身份确认
 
-安装完成不等于已登录。先使用 `lark-cli config init --new` 通过受保护的交互提示建立本机应用配置，再执行 `lark-cli auth login` 完成浏览器 OAuth。随后以 `lark-cli auth status --json --verify` 和 `lark-cli whoami --json` 确认实际身份。完整的分平台步骤与无凭据验收清单在 [docs/deployment.md](docs/deployment.md)。
+安装完成不等于已登录。先使用 `lark-cli config init --new` 通过受保护的交互提示建立本机应用配置，再执行 `lark-cli auth login` 完成浏览器 OAuth。随后以 `lark-cli auth status --json --verify` 和 `lark-cli whoami` 确认实际身份。已安装的 1.0.93 版本会在不带额外 JSON flag 时输出 JSON；升级后仍应以当前运行时帮助为准。完整的分平台步骤与无凭据验收清单在 [docs/deployment.md](docs/deployment.md)。
 
 ## 更新
 

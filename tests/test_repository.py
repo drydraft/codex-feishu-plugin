@@ -16,6 +16,12 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 FENCED_CODE_BLOCK = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+MAINTAINED_DOCUMENTS = (
+    "README.md",
+    "docs/deployment.md",
+    "docs/superpowers/specs/2026-09-03-codex-feishu-plugin-design.md",
+    "docs/superpowers/plans/2026-09-03-codex-feishu-plugin.md",
+)
 
 
 def load_json(relative_path: str) -> dict:
@@ -425,9 +431,28 @@ class RepositoryTests(unittest.TestCase):
             "lark-cli config init --new",
             "lark-cli auth login",
             "lark-cli auth status --json --verify",
-            "lark-cli whoami",
+            "lark-cli whoami\n",
         ):
             self.assertIn(command, examples)
+
+    def test_maintained_docs_use_the_verified_identity_command(self):
+        """Published guidance must never revive the invalid whoami JSON flag."""
+        for document in MAINTAINED_DOCUMENTS:
+            text = read(document)
+            self.assertIn("lark-cli whoami", text, document)
+            self.assertNotRegex(text, r"(?<![a-z-])lark-cli\s+whoami\s+--json\b", document)
+        for document in ("README.md", "docs/deployment.md"):
+            self.assertIn("1.0.93", read(document), document)
+
+    def test_docs_state_the_supported_python_minimum(self):
+        """Fresh-machine prerequisites must match the verifier's Python floor and CI."""
+        for document in ("README.md", "docs/deployment.md"):
+            self.assertIn("Python 3.9", read(document), document)
+        workflow = parse_validate_workflow()
+        setup_python = next(
+            step for step in workflow["steps"] if step["name"] == "Set up Python"
+        )
+        self.assertEqual(setup_python["with"].get("python-version"), '"3.11"')
 
     def test_docs_resolve_every_local_markdown_link_inside_the_repository(self):
         """Documentation links must neither break nor escape the checkout."""
@@ -447,6 +472,10 @@ class RepositoryTests(unittest.TestCase):
             "CODEX_PLUGIN_VALIDATOR=",
         ):
             self.assertIn(example, examples)
+        deployment = read("docs/deployment.md").lower()
+        self.assertIn("optional external validator", deployment)
+        self.assertIn("skipping", deployment)
+        self.assertIn("非零", deployment)
 
     def test_workflow_is_read_only_and_cross_platform(self):
         """CI must execute only deterministic checks with least privileges."""
@@ -471,6 +500,8 @@ class RepositoryTests(unittest.TestCase):
             "test_router_discovers_runtime_before_business_calls",
         ):
             self.assertIn(command, runs)
+        self.assertIn("Run selected repository contract tests", steps)
+        self.assertNotIn("Validate plugin manifest and bundled skills", steps)
         self.assertIn("runner.os == 'Windows'", steps["Parse PowerShell scripts"]["if"])
         self.assertIn("Parser]::ParseFile", steps["Parse PowerShell scripts"]["run"])
         self.assertIn("runner.os == 'Linux'", steps["Check POSIX shell syntax"]["if"])

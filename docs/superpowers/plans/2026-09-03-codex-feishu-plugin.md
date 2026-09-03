@@ -61,12 +61,12 @@ Expected: FAIL because marketplace and plugin manifest files do not exist.
 
 Create a single local marketplace entry with `AVAILABLE`, `ON_INSTALL`, and `Productivity`; create a strict-semver plugin manifest whose repository/homepage points to `https://github.com/drydraft/codex-feishu-plugin` and whose skill path is `./skills/`.
 
-- [ ] **Step 4: Run the manifest tests and Codex plugin validator**
+- [ ] **Step 4: Run the manifest tests and optional Codex plugin validator**
 
 Run: `python -m unittest tests.test_repository -v`
 Expected: PASS.
 
-Run: `python ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/codex-feishu`
+When the local plugin validator is installed, run: `python ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/codex-feishu`
 Expected: `Plugin validation passed`.
 
 - [ ] **Step 5: Commit the repository contract**
@@ -85,7 +85,7 @@ git commit -m "feat: add Codex Feishu plugin manifest"
 - Create: `plugins/codex-feishu/skills/feishu-setup/references/troubleshooting.md`
 
 **Interfaces:**
-- Consumes: official `lark-cli` commands `--version`, `skills list`, `config init --new`, `profile list`, `auth login`, `auth status --json --verify`, `whoami --json`, and `doctor --offline`.
+- Consumes: official `lark-cli` commands `--version`, `skills list`, `config init --new`, `profile list`, `auth login`, `auth status --json --verify`, `lark-cli whoami`, and `doctor --offline`.
 - Produces: skill namespace `$codex-feishu:feishu-setup` with a deterministic read-only-first setup and diagnosis workflow.
 
 - [ ] **Step 1: Add failing skill-contract tests**
@@ -93,7 +93,7 @@ git commit -m "feat: add Codex Feishu plugin manifest"
 ```python
 def test_setup_skill_requires_safe_oauth_flow():
     text = read("plugins/codex-feishu/skills/feishu-setup/SKILL.md")
-    for command in ("lark-cli skills list", "lark-cli config init --new", "auth status --json --verify", "whoami --json"):
+    for command in ("lark-cli skills list", "lark-cli config init --new", "auth status --json --verify", "lark-cli whoami"):
         assert command in text
     assert "storage.json" not in text
     assert "api.trae" not in text
@@ -206,7 +206,7 @@ def test_installers_have_no_secret_or_trae_inputs():
         assert "plugin add codex-feishu@codex-feishu" in text
 ```
 
-Add checks that both verify scripts run `lark-cli --version`, `lark-cli skills list`, the repository tests, and the Codex plugin validator without calling `auth login` or a business API.
+Add checks that both verify scripts run `lark-cli --version`, `lark-cli skills list`, and repository tests without calling `auth login` or a business API; run the Codex plugin validator as an additional strict check when it is installed or explicitly configured.
 
 - [ ] **Step 2: Run script tests and verify failure**
 
@@ -277,7 +277,7 @@ README covers capabilities, trust boundary, installation, first authentication, 
 Run: `python -m unittest discover -s tests -v`
 Expected: PASS.
 
-Run: `python ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/codex-feishu`
+When the local plugin validator is installed, run: `python ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/codex-feishu`
 Expected: `Plugin validation passed`.
 
 - [ ] **Step 5: Commit documentation and CI**

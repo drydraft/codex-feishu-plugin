@@ -80,7 +80,7 @@ Setup uses an app owned by the person or organization installing the plugin:
 1. Install official `lark-cli`.
 2. Run `lark-cli config init --new` to configure the Feishu/Lark app.
 3. Run a narrowly scoped `lark-cli auth login` flow.
-4. Verify with `lark-cli auth status --json --verify` and `lark-cli whoami --json`.
+4. Verify with `lark-cli auth status --json --verify` and `lark-cli whoami`.
 
 Credentials remain in storage managed by `lark-cli`. Bootstrap scripts must never accept secrets as command-line arguments, echo tokens, copy profiles into the repository, or write `.env` files containing credentials.
 
@@ -128,13 +128,13 @@ The test suite validates:
 - installer scripts contain no credential parameters or Trae session access;
 - referenced local files exist;
 - PowerShell and shell scripts parse successfully where the runner supports them;
-- the official Codex plugin and skill validators pass.
+- repository contract tests pass; when locally installed, the optional Codex plugin validator and the skill validators pass.
 
 GitHub Actions runs deterministic tests on Windows and Ubuntu. Live Feishu API calls are excluded from CI because they require user credentials and must not rely on repository secrets for this personal plugin.
 
 ## Acceptance criteria
 
-- The Codex plugin validator passes.
+- When locally installed, the optional Codex plugin validator passes.
 - The Codex skill validator passes for both bundled skills.
 - Repository tests pass on the local Windows machine.
 - GitHub Actions configuration is present and least-privilege.
