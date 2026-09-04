@@ -1,10 +1,10 @@
 # 部署与首次配置
 
-本指南从一台新机器开始安装私有仓库中的 Codex Feishu Plugin。它只安装官方 `lark-cli`、注册本地 Codex 市场、安装插件并执行本地静态检查；不会登录、不会在命令行要求 App Secret，也不会在验证期间调用任何飞书业务 API。
+本指南从一台新机器开始安装公开仓库中的 Codex Feishu Plugin。它只安装官方 `lark-cli`、注册本地 Codex 市场、安装插件并执行本地静态检查；不会登录、不会在命令行要求 App Secret，也不会在验证期间调用任何飞书业务 API。
 
-## 0. 获取私有仓库
+## 0. 获取公开仓库
 
-仓库为 <https://github.com/drydraft/codex-feishu-plugin>。执行克隆前，当前 GitHub 帐户必须已有读取权限；若 Git 报告无权限，请请求仓库访问授权。不要用同事的 token、profile 或私人文件绕过访问控制。
+仓库为 <https://github.com/drydraft/codex-feishu-plugin>，可以直接通过 HTTPS 克隆，不需要仓库读取授权。不要把 GitHub token、飞书 profile 或私人文件写入仓库。
 
 ```text
 git clone https://github.com/drydraft/codex-feishu-plugin.git
