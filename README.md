@@ -1,203 +1,172 @@
-# Codex Feishu Plugin
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="Codex Feishu Plugin：让 Codex 通过飞书官方 lark-cli 与 lark-* skills，安全处理文档、多维表格、云盘、日历、消息、任务与审批。">
+</p>
 
-让 Codex 通过飞书官方 [`lark-cli`](https://github.com/larksuite/cli) 和其运行时提供的 `lark-*` skills，安全地处理飞书/Lark 文档、云盘、知识库、多维表格、电子表格、消息、日历、审批等工作。
+<p align="center">
+  <a href="https://github.com/larksuite/cli"><img src="https://img.shields.io/badge/powered_by-lark--cli-3370FF?style=flat-square&logo=feishu" alt="Powered by lark-cli"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10B981?style=flat-square" alt="MIT License"></a>
+  <a href="#-支持平台与系统"><img src="https://img.shields.io/badge/platform-Windows_|_macOS_|_Linux-8B5CF6?style=flat-square" alt="Supported Platforms"></a>
+  <a href="#-安全与信任边界"><img src="https://img.shields.io/badge/security-Zero_Secrets-00D6B9?style=flat-square" alt="Zero Secrets"></a>
+</p>
 
-- 公开仓库：<https://github.com/Song-JunYou/codex-feishu-plugin>
-- 许可证：[MIT](LICENSE)
-- 支持系统：Windows、macOS、Linux
-- 安装方式：本地 Codex 插件市场
+---
 
-> 本项目是 Codex 的飞书工作流路由插件，不是独立的飞书 API SDK。实际命令、权限范围和业务能力以本机安装版本的 `lark-cli` 帮助与 skills 为准。
+## 💡 一分钟看懂：它是什么？
 
-## 最快安装：把下面整段复制给 AI
+**Codex Feishu Plugin** 是专为 [Codex](https://github.com/openai/codex) 设计的**飞书/Lark 企业级全场景工作流路由插件**。
 
-在 Codex 或其他能操作本机终端的 AI 中，新建任务并完整粘贴下面的提示词。AI 会自动判断当前操作系统，安装插件，然后引导你在浏览器中完成飞书授权。
+以往让 AI 操作飞书往往需要开发者手写繁琐的 OpenAPI 胶水代码，还存在 App Secret 泄露到对话或环境中的高危风险。本项目通过桥接飞书官方开源的 [`lark-cli`](https://github.com/larksuite/cli) 及其底层完善的 `lark-*` Skills 生态，让 Codex **零凭据外泄、完全合规**地接管文档编辑、多维表格增删改查、即时群消息推送、日程预约及协同审批！
+
+<p align="center">
+  <img src="./assets/readme/architecture.svg" width="100%" alt="Codex Feishu Plugin 架构与信任边界：Codex 任务请求 → 工作流路由层 → 官方 lark-cli 引擎 → 飞书开放平台。">
+</p>
+
+---
+
+## ⚡ 核心能力矩阵
+
+插件通过内置的 `feishu-workflow-router` 智能识别用户意图与飞书资源链接，自动调度本机官方 `lark-*` Skills：
+
+| 飞书业务模块 | 官方运行时 Skill | 支持的核心操作场景 |
+| --- | --- | --- |
+| 📊 **多维表格 (Base)** | `lark-base` | 自动建表、字段定义、批量增删改查记录、多视图过滤、仪表盘、公式计算 |
+| 📄 **云文档 (Docx / Wiki)** | `lark-doc` / `lark-wiki` | Markdown 与文档双向转换、段落增改、思维笔记、知识库目录与节点管理 |
+| 📁 **云空间 (Drive)** | `lark-drive` | 文件与文件夹上传/下载/移动/删除、元数据检索、权限配置与外链管理 |
+| 💬 **即时消息 (IM)** | `lark-im` | 个人/群聊消息收发、富文本与互动卡片（Interactive Card）推送、群成员管理 |
+| 📅 **日历与会议 (Calendar)** | `lark-calendar` / `lark-meeting` | 日程智能排期、忙闲检索、会议室预订、妙记/逐字稿提取与纪要提炼 |
+| ✅ **任务与审批 (Task/Approval)** | `lark-task` / `lark-approval` | 待办任务清单、拆分子任务、发起原生审批单、查询待办与审批进度跟踪 |
+| 🕒 **考勤打卡 (Attendance)** | `lark-attendance` | 个人出勤打卡记录查询与工时统计 |
+| 🛠️ **妙搭与开放能力** | `lark-apps` / `lark-openapi-explorer` | 妙搭应用数据维护、探索调用官方 CLI 尚未封装的原生 OpenAPI 接口 |
+
+---
+
+## 🔒 安全与信任边界 (Zero Secrets)
+
+本插件严格遵循**企业级最小权限与零凭据驻留**原则：
+
+1. **绝对零 Secret 外泄**：插件本身与仓库代码**不存储、不中转、不记录任何 App ID 或 App Secret**；
+2. **官方 OAuth 浏览器鉴权**：登录过程由官方 `lark-cli` 唤起浏览器完成飞书官方扫码，凭据由系统安全存储（Keyring）直接持有；
+3. **强制安全确认机制**：涉及数据删除、大批量覆盖、发布或扩大权限等破坏性操作时，Agent 会强制展示预览并等待用户确认，支持 `dry-run` 模式试运行。
+
+---
+
+## 🚀 极速安装与部署
+
+### 方式一：直接复制给 AI 自动执行（推荐）
+
+在 Codex 或具备终端执行能力的 AI 助手中新建任务，完整粘贴以下提示词，AI 将全自动完成环境检测、依赖安装与引导：
 
 ```text
 请帮我从公开仓库 https://github.com/Song-JunYou/codex-feishu-plugin 安装 Codex Feishu Plugin，并完成首次配置和登录。请直接执行，不要只给我步骤说明。
 
 要求：
-1. 先检测当前操作系统和终端环境，并检查 git、node、npx、codex、Python 是否可用；Python 必须为 3.9 或更高版本。缺少前置软件时，明确告诉我缺什么以及官方安装方式，不要使用来路不明的安装包。
-2. 如果本机还没有仓库，请把它克隆到合适的用户项目目录；如果已经存在同一仓库，请确认工作区没有会被覆盖的修改，再执行 git pull --ff-only。不要删除或覆盖用户现有文件。
-3. 进入仓库后按系统运行官方脚本：
+1. 先检测当前操作系统和终端环境，检查 git、node、npx、codex、Python（>=3.9）是否就绪；
+2. 若本地无此仓库，请克隆到合适目录；若已存在，请确认无冲突后执行 git pull --ff-only；
+3. 执行系统对应安装脚本：
    - Windows：powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
    - macOS/Linux：sh ./scripts/install.sh
-4. 安装过程中若 lark-cli 尚未安装，允许安装脚本调用官方入口 npx @larksuite/cli@latest install。
-5. 安装完成后，阅读仓库中的 docs/deployment.md，以及已安装插件的 feishu-setup 与 feishu-workflow-router skill，再进行配置。不要猜测当前 lark-cli 的参数，先查看当前版本帮助。
-6. 先运行 lark-cli config init --new。涉及 App Secret、token 或其他凭据时，只允许我在 CLI 的受保护交互提示或官方网页中亲自输入；不要让我把凭据发送到聊天、写入命令行、.env、日志或仓库。
-7. 配置完成后运行 lark-cli auth login，打开或提供官方飞书授权页面并暂停，等我亲自扫码/登录和确认授权后再继续。不要代替我确认账户授权。
-8. 授权完成后依次验证：codex plugin list、lark-cli --version、lark-cli skills list、lark-cli profile list、lark-cli auth status --json --verify、lark-cli whoami。
-9. 不要复制其他机器的 lark-cli profile、浏览器会话或凭据文件，也不要在验收阶段修改任何飞书业务数据。
-10. 最后汇报：插件是否安装成功、lark-cli 版本、当前 profile、用户和机器人身份状态、仍缺少的权限或需要我完成的动作。若中途遇到错误，请先诊断并尝试安全修复；只有需要我输入敏感信息或亲自授权时才暂停。
+4. 找不到 lark-cli 时，允许脚本通过 npx @larksuite/cli@latest install 调用官方安装；
+5. 运行 lark-cli config init --new。涉及 App Secret 时，只允许我在 CLI 交互提示或网页中输入，严禁打印到聊天或写入代码；
+6. 运行 lark-cli auth login，引导我打开官方页面完成扫码授权；
+7. 授权后验证：codex plugin list、lark-cli --version、lark-cli whoami，汇报安装就绪状态。
 ```
 
-授权完成后，建议重新打开一个 Codex 任务，让新安装的插件和 skills 被完整加载。
+---
 
-## 手动安装
+### 方式二：手动执行安装脚本
 
-### 前置条件
+#### 前置要求
 
-本机需要以下命令：
+* `git`、`node`、`npx`
+* `codex` CLI
+* `Python 3.9+`
 
-- `git`
-- `node` 与 `npx`
-- `codex`
-- Python 3.9 或更高版本：Windows 通常使用 `python`，macOS/Linux 通常使用 `python3`
-
-安装脚本只负责安装官方 `lark-cli`、注册本地插件市场、安装插件并运行验证；不会自动登录飞书，也不会读取或保存你的 App Secret。
-
-### 1. 克隆公开仓库
+#### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/Song-JunYou/codex-feishu-plugin.git
 cd codex-feishu-plugin
 ```
 
-### 2. 运行安装脚本
+#### 2. 运行一键安装脚本
 
-Windows PowerShell：
+* **Windows (PowerShell)**:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-```
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+  ```
 
-macOS/Linux：
+* **macOS / Linux**:
 
-```sh
-sh ./scripts/install.sh
-```
+  ```bash
+  sh ./scripts/install.sh
+  ```
 
-脚本会完成以下工作：
+---
 
-1. 检查必要命令和 Python 版本；
-2. 找不到 `lark-cli` 时，通过 `npx @larksuite/cli@latest install` 调用官方安装入口；
-3. 将当前仓库注册为名为 `codex-feishu` 的本地 Codex 市场；
-4. 安装 `codex-feishu@codex-feishu`；
-5. 运行仓库测试、插件结构检查和 `lark-cli` 只读验证。
+## 🔑 首次配置与飞书授权
 
-更完整的分平台说明见 [部署与首次配置指南](docs/deployment.md)。
+安装完成后，只需三步即可激活飞书权限：
 
-## 首次配置与飞书授权
-
-插件安装成功不等于飞书账号已经登录。每台机器都要独立完成配置和 OAuth，不要复制其他机器的 profile 或凭据。
-
-```text
+```bash
+# 1. 验证 CLI 与可用技能列表
 lark-cli --version
 lark-cli skills list
-lark-cli profile list
-lark-cli doctor --offline
+
+# 2. 交互式初始化应用配置（输入你在飞书开放平台申请的企业自建应用凭据）
 lark-cli config init --new
-```
 
-`lark-cli config init --new` 是交互式配置。App Secret、token 等敏感值只能在 CLI 的受保护提示或飞书官方页面中输入，不要放入命令参数、聊天记录、Issue、日志或仓库。
-
-配置完成后发起用户登录：
-
-```text
+# 3. 浏览器扫码登录授权
 lark-cli auth login
 ```
 
-请在打开的飞书官方页面中亲自登录并确认授权。完成后验证当前 profile 和实际身份：
+授权完成后，运行身份核验：
 
-```text
-lark-cli profile list
+```bash
 lark-cli auth status --json --verify
 lark-cli whoami
 ```
 
-`auth status` 用于查看用户与机器人身份是否可用，`whoami` 用于确认当前实际登录人。`lark-cli` 1.0.93 的 `whoami` 不需要额外 JSON 参数；其他版本请以本机 `--help` 为准。
+---
 
-## 可以处理哪些飞书工作
+## 💬 日常对话指令示例
 
-插件会根据请求选择匹配的官方运行时 skill，常见场景包括：
+完成安装后，在 Codex 任务中即可像使用原生功能一样下达指令：
 
-- 飞书文档、知识库和云盘文件；
-- 多维表格 Base、电子表格、视图、仪表盘和工作流；
-- 即时消息、群聊与卡片；
-- 日历、任务、审批与考勤；
-- 会议、妙记及其他当前 `lark-cli` 已公开的能力；
-- 飞书身份、scope、资源共享和授权问题排查。
+* **多维表格数据分析**：
+  > “读取这个多维表格，统计本周各负责人的未完成工单分布，只读分析不要改写数据：`<粘贴飞书 Base 链接>`”
+* **群消息推送**：
+  > “向【技术架构同步群】发送一条版本发布通知卡片，包含本次发布的 3 个核心特性与上线时间。”
+* **日程排期**：
+  > “帮我查一下明天下午 2 点到 4 点李工和王工的忙闲状态，预约一个 45 分钟的技术评审会议。”
+* **云文档生成**：
+  > “把刚才讨论的系统重构方案整理为一篇飞书云文档，并在结尾插入思维导图大纲。”
 
-安装后可以直接对 Codex 说：
+---
 
-```text
-查看我的飞书登录状态，并告诉我用户身份和机器人身份是否都可用。
-```
+## ❓ 常见问题排查
 
-```text
-读取这个飞书多维表格，先分析字段和视图，不要修改数据：<粘贴 Base 链接>
-```
+| 现象 | 排查与解决指引 |
+| --- | --- |
+| **找不到 `lark-cli`** | 确认 `npx --version` 可用，关闭当前终端窗口重新打开，让安装后的系统 `PATH` 变量生效。 |
+| **已登录但提示无权访问文档/Base** | 检查自建应用是否已开通对应领域的权限 Scope（如 `bitable:app:read`），并确认该文档已在飞书内分享给机器人或当前登录用户。 |
+| **Codex 提示找不到插件** | 执行 `codex plugin list` 查看 `codex-feishu` 是否已成功注册。如目录移动过，重新运行安装脚本即可自动修复路径。 |
+| **需要卸载插件** | 运行 `codex plugin remove codex-feishu@codex-feishu` 及 `codex plugin marketplace remove codex-feishu`。 |
 
-```text
-在执行任何写操作前先给我看 dry-run；涉及删除、覆盖或扩大权限时必须再次向我确认。
-```
+---
 
-## 工作原理与信任边界
+## 🛠️ 本地开发与测试
 
-```text
-你的请求
-  -> Codex Feishu 路由 skill
-  -> 本机官方 lark-cli 与对应 lark-* skill
-  -> 本机保存的 profile 和用户亲自完成的 OAuth
-  -> 飞书官方接口
-```
+仓库包含完备的跨平台自动化单元测试（无需真实飞书凭据）：
 
-本仓库只提供插件清单、安装脚本和工作流路由说明：
-
-- 不内置或转存 token、App Secret、`.env`、浏览器会话和私人飞书数据；
-- 不复制或修改其他产品的私有配置；
-- 不在 CI 中登录飞书或调用飞书业务 API；
-- 写操作、高风险操作和所需 scope 由当前 `lark-cli`、对应 skill 及用户授权共同约束；
-- 资源访问还取决于飞书应用权限、用户授权、资源共享权限和当前所选 profile。
-
-## 更新
-
-在仓库目录执行：
-
-```text
-git pull --ff-only
-```
-
-然后重新运行当前系统的安装脚本。安装器会重新校验市场路径并安装最新本地版本；不会迁移或覆盖 OAuth 凭据。
-
-更新后可单独运行验证脚本：
-
-- Windows：[scripts/verify.ps1](scripts/verify.ps1)
-- macOS/Linux：[scripts/verify.sh](scripts/verify.sh)
-
-## 卸载
-
-```text
-codex plugin remove codex-feishu@codex-feishu
-codex plugin marketplace remove codex-feishu
-```
-
-这些命令只移除本机 Codex 插件和市场配置，不会删除飞书云端数据，也不会自动撤销飞书 OAuth。确认不再需要仓库后，再用操作系统的常规方式删除本地克隆目录。
-
-## 常见问题
-
-### 找不到 `lark-cli`
-
-先确认 `node --version` 和 `npx --version` 正常，再重新执行安装脚本。若刚完成安装，请关闭并重新打开终端，让 PATH 变化生效。
-
-### 已登录但仍然无权访问文档或 Base
-
-依次检查：当前 profile、实际用户身份、应用 scope、用户授权、资源是否分享给当前用户，以及对应 API 是否支持当前身份。不要通过盲目扩大权限来代替诊断。
-
-### 安装后 Codex 没有识别插件
-
-运行 `codex plugin list` 检查 `codex-feishu`，然后新建或重启 Codex 任务。若市场目录发生过变化，重新运行安装脚本即可修正注册路径。
-
-### 不确定应该用哪个命令
-
-先运行 `lark-cli skills list`，再读取 `lark-shared` 和匹配业务领域的 skill；命令参数始终以当前版本的 `--help` 与 schema 为准。详细排查路径见 [插件故障排查表](plugins/codex-feishu/skills/feishu-setup/references/troubleshooting.md)。
-
-## 开发与验证
-
-仓库测试不需要飞书账号或凭据：
-
-```text
+```bash
 python -m unittest discover -s tests -v
 ```
 
-CI 在 Windows 与 Ubuntu 上运行确定性测试和脚本语法检查。上游 CLI 的实现、版本和许可证请查看 [`larksuite/cli`](https://github.com/larksuite/cli)。
+CI 自动在 Windows 与 Linux 环境下验证插件元数据、安装脚本及技能路由完整性。
+
+---
+
+<p align="center">
+  Made with ☕ by <a href="https://github.com/Song-JunYou">Song-JunYou</a> · Powered by <a href="https://github.com/larksuite/cli">lark-cli</a> &amp; <a href="https://github.com/openai/codex">Codex</a>
+</p>

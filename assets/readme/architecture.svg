@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">Codex Feishu Plugin 架构与信任边界</title>
+  <desc id="arch-desc">展示 Codex 任务请求如何通过本地工作流路由、官方 lark-cli 与 OAuth 认证最终与飞书官方 API 交互的信任边界</desc>
+
+  <defs>
+    <linearGradient id="step-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#131B2A"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#3370FF"/>
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1200" height="260" rx="16" fill="#0B0F17" stroke="#1E293B" stroke-width="1.5"/>
+
+  <!-- Step 1: Codex Request -->
+  <g transform="translate(48, 36)">
+    <rect width="240" height="188" rx="10" fill="url(#step-bg)" stroke="#334155" stroke-width="1"/>
+    <rect x="16" y="16" width="32" height="24" rx="4" fill="#1E293B"/>
+    <text x="26" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#38BDF8">01</text>
+    <text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#F8FAFC">Codex 任务请求</text>
+    <path d="M 16 52 L 224 52" stroke="#1E293B" stroke-width="1"/>
+    
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" fill="#94A3B8">自然语言指令输入：</text>
+    <rect x="16" y="86" width="208" height="54" rx="6" fill="#090D14" stroke="#1E293B"/>
+    <text x="24" y="106" font-family="-apple-system, sans-serif" font-size="11" fill="#64748B">"读取多维表格中的任务"</text>
+    <text x="24" y="126" font-family="-apple-system, sans-serif" font-size="11" fill="#64748B">"向项目群发一条交互卡片"</text>
+    <text x="16" y="162" font-family="-apple-system, sans-serif" font-size="11" fill="#38BDF8">✓ 支持只读 / dry-run 审查</text>
+  </g>
+
+  <!-- Arrow 1 -> 2 -->
+  <path d="M 298 130 L 328 130" stroke="#3370FF" stroke-width="2" marker-end="url(#arrow-blue)"/>
+
+  <!-- Step 2: Feishu Workflow Router -->
+  <g transform="translate(338, 36)">
+    <rect width="240" height="188" rx="10" fill="url(#step-bg)" stroke="#3370FF" stroke-width="1.2"/>
+    <rect x="16" y="16" width="32" height="24" rx="4" fill="#1E3A8A"/>
+    <text x="26" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#93C5FD">02</text>
+    <text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#60A5FA">工作流路由层</text>
+    <path d="M 16 52 L 224 52" stroke="#1E293B" stroke-width="1"/>
+
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" fill="#94A3B8">feishu-workflow-router：</text>
+    <rect x="16" y="86" width="208" height="54" rx="6" fill="#090D14" stroke="#1E293B"/>
+    <text x="24" y="106" font-family="-apple-system, sans-serif" font-size="11" fill="#38BDF8">解析飞书 URL 与操作意图</text>
+    <text x="24" y="126" font-family="-apple-system, sans-serif" font-size="11" fill="#38BDF8">自动匹配 lark-* 官方技能</text>
+    <text x="16" y="162" font-family="-apple-system, sans-serif" font-size="11" fill="#38BDF8">✓ 危险操作前强制用户确认</text>
+  </g>
+
+  <!-- Arrow 2 -> 3 -->
+  <path d="M 588 130 L 618 130" stroke="#3370FF" stroke-width="2" marker-end="url(#arrow-blue)"/>
+
+  <!-- Step 3: Official lark-cli Engine -->
+  <g transform="translate(628, 36)">
+    <rect width="240" height="188" rx="10" fill="url(#step-bg)" stroke="#00D6B9" stroke-width="1.2"/>
+    <rect x="16" y="16" width="32" height="24" rx="4" fill="#064E3B"/>
+    <text x="26" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#A7F3D0">03</text>
+    <text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#00D6B9">官方 lark-cli 引擎</text>
+    <path d="M 16 52 L 224 52" stroke="#1E293B" stroke-width="1"/>
+
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" fill="#94A3B8">本机环境与安全隔离：</text>
+    <rect x="16" y="86" width="208" height="54" rx="6" fill="#090D14" stroke="#1E293B"/>
+    <text x="24" y="106" font-family="-apple-system, sans-serif" font-size="11" fill="#A7F3D0">OAuth 浏览器官方网页扫码</text>
+    <text x="24" y="126" font-family="-apple-system, sans-serif" font-size="11" fill="#A7F3D0">零 Secret 转存 / 零代码侵入</text>
+    <text x="16" y="162" font-family="-apple-system, sans-serif" font-size="11" fill="#00D6B9">✓ 凭据只存系统受保护存储</text>
+  </g>
+
+  <!-- Arrow 3 -> 4 -->
+  <path d="M 878 130 L 908 130" stroke="#3370FF" stroke-width="2" marker-end="url(#arrow-blue)"/>
+
+  <!-- Step 4: Feishu OpenAPI -->
+  <g transform="translate(918, 36)">
+    <rect width="234" height="188" rx="10" fill="url(#step-bg)" stroke="#3370FF" stroke-width="1.2"/>
+    <rect x="16" y="16" width="32" height="24" rx="4" fill="#3370FF"/>
+    <text x="26" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="bold" fill="#FFFFFF">04</text>
+    <text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#60A5FA">飞书开放平台</text>
+    <path d="M 16 52 L 218 52" stroke="#1E293B" stroke-width="1"/>
+
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" fill="#94A3B8">飞书企业原生应用：</text>
+    <rect x="16" y="86" width="202" height="54" rx="6" fill="#090D14" stroke="#1E293B"/>
+    <text x="24" y="106" font-family="ui-monospace, monospace" font-size="11" fill="#38BDF8">OpenAPI SSL 加密调用</text>
+    <text x="24" y="126" font-family="-apple-system, sans-serif" font-size="11" fill="#64748B">文档/多维表格/审批/消息</text>
+    <text x="16" y="162" font-family="-apple-system, sans-serif" font-size="11" fill="#10B981">✓ 企业权限与审计日志闭环</text>
+  </g>
+</svg>
