@@ -50,6 +50,12 @@
 
 ---
 
+## 🖥️ 支持平台与系统
+
+Windows、macOS 与 Linux。安装脚本见 [install.ps1](scripts/install.ps1) / [install.sh](scripts/install.sh)，许可证为 [MIT](LICENSE)。
+
+---
+
 ## 🚀 极速安装与部署
 
 ### 方式一：直接复制给 AI 自动执行（推荐）
@@ -57,7 +63,7 @@
 在 Codex 或具备终端执行能力的 AI 助手中新建任务，完整粘贴以下提示词，AI 将全自动完成环境检测、依赖安装与引导：
 
 ```text
-请帮我从公开仓库 https://github.com/Song-JunYou/codex-feishu-plugin 安装 Codex Feishu Plugin，并完成首次配置和登录。请直接执行，不要只给我步骤说明。
+请帮我从公开仓库 https://github.com/drydraft/codex-feishu-plugin 安装 Codex Feishu Plugin，并完成首次配置和登录。请直接执行，不要只给我步骤说明。
 
 要求：
 1. 先检测当前操作系统和终端环境，检查 git、node、npx、codex、Python（>=3.9）是否就绪；
@@ -84,7 +90,7 @@
 #### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/Song-JunYou/codex-feishu-plugin.git
+git clone https://github.com/drydraft/codex-feishu-plugin.git
 cd codex-feishu-plugin
 ```
 
@@ -127,6 +133,8 @@ lark-cli auth status --json --verify
 lark-cli whoami
 ```
 
+已安装的 1.0.93 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。更完整的机器部署、OAuth 边界和验证步骤见 [部署指南](docs/deployment.md)。
+
 ---
 
 ## 💬 日常对话指令示例
@@ -157,7 +165,7 @@ lark-cli whoami
 
 ## 🛠️ 本地开发与测试
 
-仓库包含完备的跨平台自动化单元测试（无需真实飞书凭据）：
+更细的验收清单见 [部署指南](docs/deployment.md)。仓库包含完备的跨平台自动化单元测试（无需真实飞书凭据）：
 
 ```bash
 python -m unittest discover -s tests -v
