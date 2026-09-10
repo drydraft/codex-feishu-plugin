@@ -131,7 +131,7 @@ lark-cli whoami
 
 ## 💬 日常对话指令示例
 
-完成安装后，在 Codex 任务中即可像使用原生功能一样下达指令：
+插件技能默认不注入系统提示。用时先显式唤起 `$codex-feishu:feishu-workflow-router`（安装/登录用 `$codex-feishu:feishu-setup`），再下达指令：
 
 * **多维表格数据分析**：
   > “读取这个多维表格，统计本周各负责人的未完成工单分布，只读分析不要改写数据：`<粘贴飞书 Base 链接>`”
