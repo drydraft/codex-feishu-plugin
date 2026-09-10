@@ -1,6 +1,7 @@
 ---
 name: feishu-workflow-router
 description: Use when a Feishu or Lark task needs domain routing, profile and identity selection, or a safe lark-cli read or write workflow.
+disable-model-invocation: true
 ---
 
 # Runtime-discovered Feishu workflow router

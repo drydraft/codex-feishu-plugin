@@ -1,6 +1,7 @@
 ---
 name: feishu-setup
 description: Use when installing, configuring, authenticating, or diagnosing the official Feishu/Lark CLI on a new machine.
+disable-model-invocation: true
 ---
 
 # Feishu setup and diagnostics

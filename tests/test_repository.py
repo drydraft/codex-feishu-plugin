@@ -93,7 +93,7 @@ def parse_frontmatter(relative_path: str) -> dict[str, str]:
 
     metadata = {}
     for line in lines[1:closing_index]:
-        match = re.fullmatch(r"([a-z_]+):\s*(.+)", line)
+        match = re.fullmatch(r"([a-z0-9_-]+):\s*(.+)", line)
         if not match:
             raise AssertionError(f"Unsupported frontmatter entry in {relative_path}: {line}")
         key, value = match.groups()
@@ -111,6 +111,10 @@ def parse_skill_interface(relative_path: str) -> dict[str, str]:
 
     metadata = {}
     for line in lines[1:]:
+        if line.lstrip().startswith("#"):
+            continue
+        if not line.startswith("  "):
+            break
         match = re.fullmatch(r'  ([a-z_]+):\s*("(?:[^"\\]|\\.)*")', line)
         if not match:
             raise AssertionError(f"Unsupported interface entry in {relative_path}: {line}")
@@ -119,6 +123,28 @@ def parse_skill_interface(relative_path: str) -> dict[str, str]:
             raise AssertionError(f"Duplicate interface key in {relative_path}: {key}")
         metadata[key] = json.loads(value)
     return metadata
+
+
+def parse_skill_policy(relative_path: str) -> dict[str, str]:
+    """Parse the optional top-level policy mapping in agents/openai.yaml."""
+    lines = [line for line in read(relative_path).splitlines() if line.strip()]
+    try:
+        start = lines.index("policy:")
+    except ValueError as error:
+        raise AssertionError(f"{relative_path} has no policy mapping") from error
+
+    policy = {}
+    for line in lines[start + 1:]:
+        if not line.startswith("  "):
+            break
+        match = re.fullmatch(r"  ([a-z_]+):\s*(.+)", line)
+        if not match:
+            raise AssertionError(f"Unsupported policy entry in {relative_path}: {line}")
+        key, value = match.groups()
+        if key in policy:
+            raise AssertionError(f"Duplicate policy key in {relative_path}: {key}")
+        policy[key] = value
+    return policy
 
 
 def active_yaml_line(line: str) -> str:
@@ -308,9 +334,16 @@ class RepositoryTests(unittest.TestCase):
         metadata = parse_skill_interface(metadata_path)
 
         self.assertTrue((REPOSITORY_ROOT / reference_path).is_file())
-        self.assertEqual(set(frontmatter), {"name", "description"})
+        self.assertEqual(
+            set(frontmatter), {"name", "description", "disable-model-invocation"}
+        )
         self.assertEqual(frontmatter["name"], "feishu-setup")
         self.assertTrue(frontmatter["description"])
+        self.assertEqual(frontmatter["disable-model-invocation"], "true")
+        self.assertEqual(
+            parse_skill_policy(metadata_path),
+            {"allow_implicit_invocation": "false"},
+        )
         for command in (
             "lark-cli skills list",
             "lark-cli config init --new",
@@ -350,7 +383,7 @@ class RepositoryTests(unittest.TestCase):
 
         self.assertEqual(
             metadata["default_prompt"],
-            "Use $codex-feishu:feishu-setup to install and verify Feishu CLI access on this machine.",
+            "Use $codex-feishu:feishu-setup for Feishu CLI setup.",
         )
 
     def test_router_discovers_runtime_before_business_calls(self):
@@ -408,16 +441,25 @@ class RepositoryTests(unittest.TestCase):
         metadata = parse_skill_interface(
             "plugins/codex-feishu/skills/feishu-workflow-router/agents/openai.yaml"
         )
-        self.assertEqual(set(frontmatter), {"name", "description"})
+        self.assertEqual(
+            set(frontmatter), {"name", "description", "disable-model-invocation"}
+        )
         self.assertEqual(frontmatter["name"], "feishu-workflow-router")
         self.assertTrue(frontmatter["description"])
+        self.assertEqual(frontmatter["disable-model-invocation"], "true")
         self.assertEqual(
             set(metadata), {"display_name", "short_description", "default_prompt"}
+        )
+        self.assertEqual(
+            parse_skill_policy(
+                "plugins/codex-feishu/skills/feishu-workflow-router/agents/openai.yaml"
+            ),
+            {"allow_implicit_invocation": "false"},
         )
 
         self.assertEqual(
             metadata["default_prompt"],
-            "Use $codex-feishu:feishu-workflow-router to safely route and execute this Feishu task with the installed lark-cli runtime.",
+            "Use $codex-feishu:feishu-workflow-router for Feishu work.",
         )
 
     def test_installers_have_no_secret_or_trae_inputs(self):
