@@ -317,7 +317,7 @@ class RepositoryTests(unittest.TestCase):
     def test_plugin_manifest_is_safe_and_versioned(self):
         plugin = load_json("plugins/codex-feishu/.codex-plugin/plugin.json")
         self.assertEqual(plugin["name"], "codex-feishu")
-        self.assertEqual(plugin["version"], "0.1.0")
+        self.assertEqual(plugin["version"], "0.2.0")
         self.assertEqual(plugin["license"], "MIT")
         self.assertNotIn("mcpServers", plugin)
         self.assertEqual(plugin["skills"], "./skills/")
@@ -537,7 +537,7 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn("lark-cli whoami", text, document)
             self.assertNotRegex(text, r"(?<![a-z-])lark-cli\s+whoami\s+--json\b", document)
         for document in ("README.md", "docs/deployment.md"):
-            self.assertIn("1.0.93", read(document), document)
+            self.assertIn("1.0.98", read(document), document)
 
     def test_docs_state_the_supported_python_minimum(self):
         """Fresh-machine prerequisites must match the verifier's Python floor and CI."""

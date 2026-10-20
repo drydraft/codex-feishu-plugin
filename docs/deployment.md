@@ -1,6 +1,6 @@
 # 部署与首次配置
 
-本指南从一台新机器开始安装公开仓库中的 Codex Feishu Plugin。它只安装官方 `lark-cli`、注册本地 Codex 市场、安装插件并执行本地静态检查；不会登录、不会在命令行要求 App Secret，也不会在验证期间调用任何飞书业务 API。
+本指南从一台新机器开始安装公开仓库中的 Feishu 插件。它只安装官方 `lark-cli`、注册本地 Codex 市场或 DSH bundle、安装插件并执行本地静态检查；不会登录、不会在命令行要求 App Secret，也不会在验证期间调用任何飞书业务 API。
 
 ## 0. 获取公开仓库
 
@@ -72,7 +72,32 @@ sh ./scripts/install.sh
    lark-cli whoami
    ```
 
-   后两项用于验证当前登录，可能连接飞书；它们不属于静态验证或 CI。已安装的 1.0.93 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。业务调用前再由插件路由 skill 选择用户或 bot/app 身份，并确认资源共享与 scope。
+   后两项用于验证当前登录，可能连接飞书；它们不属于静态验证或 CI。已安装的 1.0.98 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。业务调用前再由插件路由 skill 选择用户或 bot/app 身份，并确认资源共享与 scope。
+
+## 2.5 桌面端 DeepSeek Harness（DSH）安装
+
+DSH 桌面端由 Electron 独占管理 profile（`dsh --profile desktop` 会拒绝 CLI 启动），因此 bundle 的安装走仓库脚本：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dsh.ps1
+```
+
+脚本依次执行：
+
+1. 把 `plugins/dsh-feishu` 复制到 `<$DSH_HOME>/local-plugins/dsh-feishu`（默认 `$DSH_HOME` 为 `~/.dsh`）；
+2. 备份 profile 的 `package.json`，写入 `"dsh-feishu": "link:<绝对路径>"` 并加入 `dsh.profile.bundles`；
+3. 在 profile 目录运行 `pnpm install`；
+4. 校验 `node_modules/dsh-feishu` 已解析。
+
+随后**重启 DSH 桌面端**。重启后会话技能目录里应出现 `feishu-workflow-router` 与 `feishu-setup`；业务命令仍由本机 `lark-cli` 执行，不需要在 DSH 里再配置一次凭据。
+
+常用参数：`-ProfileName <name>` 指定 profile，`-DryRun` 只打印计划，`-SkipInstall` 跳过 pnpm。回滚：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\uninstall-dsh.ps1
+```
+
+bundle 结构与技能说明见 [DSH bundle](../plugins/dsh-feishu/README.md)；本机 28 个 `lark-*` 技能与 lark-cli 版本的对应关系见 [lark-cli 同步报告](LARK_CLI_SYNC.md)。
 
 ## 3. 无凭据验收清单
 

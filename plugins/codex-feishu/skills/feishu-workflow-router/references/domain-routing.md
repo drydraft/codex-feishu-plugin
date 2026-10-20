@@ -21,5 +21,10 @@ Use this index only after `lark-cli skills list`. Match the requested resource a
 | meeting | From the current `lark-cli skills list`, select and read the listed meeting-related skill; never substitute a remembered legacy alias. |
 | contact | Select the listed skill whose current documentation covers contacts or users. |
 | event | Select the listed skill whose current documentation covers events. |
+| apps | Select the listed skill whose current documentation covers Spark/Miaoda app development, deployment, logs, or environment variables. |
+| minutes | Select the listed skill whose current documentation covers minutes or transcripts. |
+| vc | Select the listed skill whose current documentation covers video-conference control. |
+| note | Select the listed skill whose current documentation covers notes or mind notes. |
+| markdown | Select the listed skill whose current documentation covers Markdown conversion. |
 
 If more than one listed skill plausibly matches, inspect each candidate's current description and read the one whose documented resource and operation match the request. If none matches, inspect the runtime's documented raw API route only after reading `lark-shared`; otherwise report that the current installation does not expose a supported route.

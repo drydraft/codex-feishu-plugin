@@ -1,6 +1,6 @@
 # Feishu CLI troubleshooting
 
-Start with `lark-cli doctor --offline` and preserve only redacted output. It must not authenticate or call a remote API. For the tested `lark-cli 1.0.93`, `lark-cli whoami` already emits JSON; the installed command help is authoritative for another runtime version.
+Start with `lark-cli doctor --offline` and preserve only redacted output. It must not authenticate or call a remote API. For the tested `lark-cli 1.0.98`, `lark-cli whoami` already emits JSON; the installed command help is authoritative for another runtime version.
 
 | Class | Evidence | Safe next action |
 | --- | --- | --- |

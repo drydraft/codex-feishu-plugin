@@ -1,0 +1,9 @@
+# dsh-feishu — Feishu/Lark workflow routing for DeepSeek Harness.
+#
+# Host half only: the plugin registers the two bundled skills on `ctx.skills`
+# and declares no tools, no web routes, and no system-prompt overlay. The real
+# Feishu work is delegated to the installed official `lark-cli` and its
+# embedded `lark-*` skills, which stay runtime truth.
+- insert:
+    - id: dsh-feishu
+      name: dsh-feishu

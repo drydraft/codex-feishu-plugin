@@ -1,6 +1,6 @@
 {
   "name": "codex-feishu",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Route Feishu and Lark work through the official lark-cli runtime.",
   "author": {
     "name": "drydraft",

@@ -1,0 +1,45 @@
+{
+  "name": "dsh-feishu",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Route Feishu and Lark work through the official lark-cli runtime from DeepSeek Harness.",
+  "license": "MIT",
+  "author": {
+    "name": "drydraft",
+    "url": "https://github.com/drydraft"
+  },
+  "homepage": "https://github.com/drydraft/codex-feishu-plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drydraft/codex-feishu-plugin.git",
+    "directory": "plugins/dsh-feishu"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "feishu",
+    "lark",
+    "lark-cli",
+    "bundled-skill"
+  ],
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "skills",
+    "locale",
+    "icon.svg",
+    "README.md"
+  ]
+}

@@ -13,9 +13,16 @@
 
 ## 💡 一分钟看懂：它是什么？
 
-**Codex Feishu Plugin** 是专为 [Codex](https://github.com/openai/codex) 设计的**飞书/Lark 企业级全场景工作流路由插件**。
+**Codex Feishu Plugin** 是同一套飞书/Lark 企业级工作流路由能力的**双前端**实现：一个是 [Codex](https://github.com/openai/codex) 插件，一个是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）原生 bundle。
 
-以往让 AI 操作飞书往往需要开发者手写繁琐的 OpenAPI 胶水代码，还存在 App Secret 泄露到对话或环境中的高危风险。本项目通过桥接飞书官方开源的 [`lark-cli`](https://github.com/larksuite/cli) 及其底层完善的 `lark-*` Skills 生态，让 Codex **零凭据外泄、完全合规**地接管文档编辑、多维表格增删改查、即时群消息推送、日程预约及协同审批！
+以往让 AI 操作飞书往往需要开发者手写繁琐的 OpenAPI 胶水代码，还存在 App Secret 泄露到对话或环境中的高危风险。本项目通过桥接飞书官方开源的 [`lark-cli`](https://github.com/larksuite/cli) 及其底层完善的 `lark-*` Skills 生态，让 Codex / DSH **零凭据外泄、完全合规**地接管文档编辑、多维表格增删改查、即时群消息推送、日程预约及协同审批！
+
+| 构建 | 路径 | 装载方式 |
+| --- | --- | --- |
+| Codex 插件 | `plugins/codex-feishu` | Codex marketplace + `.codex-plugin/plugin.json`，技能显式调用 |
+| DSH bundle | [`plugins/dsh-feishu`](plugins/dsh-feishu/README.md) | `dsh.profile.bundles` + Cordis `apply()`，技能注册到 `ctx.skills` |
+
+两个构建共享同一安全边界、路由顺序与失败分类，业务命令始终来自本机 `lark-cli`；本机 28 个 `lark-*` 技能与 lark-cli 1.0.98 的版本对齐关系记录在 [lark-cli 同步报告](docs/LARK_CLI_SYNC.md)。
 
 <p align="center">
   <img src="./assets/readme/architecture.svg" width="100%" alt="Codex Feishu Plugin 架构与信任边界：Codex 任务请求 → 工作流路由层 → 官方 lark-cli 引擎 → 飞书开放平台。">
@@ -25,18 +32,26 @@
 
 ## ⚡ 核心能力矩阵
 
-插件通过内置的 `feishu-workflow-router` 智能识别用户意图与飞书资源链接，自动调度本机官方 `lark-*` Skills：
+插件通过内置的 `feishu-workflow-router` 智能识别用户意图与飞书资源链接，自动调度本机官方 `lark-*` Skills（以 `lark-cli skills list` 的实际输出为准，下表对应 lark-cli 1.0.98 的 28 个技能）：
 
 | 飞书业务模块 | 官方运行时 Skill | 支持的核心操作场景 |
 | --- | --- | --- |
-| 📊 **多维表格 (Base)** | `lark-base` | 自动建表、字段定义、批量增删改查记录、多视图过滤、仪表盘、公式计算 |
-| 📄 **云文档 (Docx / Wiki)** | `lark-doc` / `lark-wiki` | Markdown 与文档双向转换、段落增改、思维笔记、知识库目录与节点管理 |
-| 📁 **云空间 (Drive)** | `lark-drive` | 文件与文件夹上传/下载/移动/删除、元数据检索、权限配置与外链管理 |
-| 💬 **即时消息 (IM)** | `lark-im` | 个人/群聊消息收发、富文本与互动卡片（Interactive Card）推送、群成员管理 |
-| 📅 **日历与会议 (Calendar)** | `lark-calendar` / `lark-meeting` | 日程智能排期、忙闲检索、会议室预订、妙记/逐字稿提取与纪要提炼 |
-| ✅ **任务与审批 (Task/Approval)** | `lark-task` / `lark-approval` | 待办任务清单、拆分子任务、发起原生审批单、查询待办与审批进度跟踪 |
-| 🕒 **考勤打卡 (Attendance)** | `lark-attendance` | 个人出勤打卡记录查询与工时统计 |
-| 🛠️ **妙搭与开放能力** | `lark-apps` / `lark-openapi-explorer` | 妙搭应用数据维护、探索调用官方 CLI 尚未封装的原生 OpenAPI 接口 |
+| 📊 **多维表格 (Base)** | `lark-base` | 自动建表、字段定义、批量增删改查、视图与过滤、公式/lookup、表单、仪表盘、BaseApp/AppMode、角色权限、模板中心 |
+| 📄 **云文档 (Docx / Wiki / Note)** | `lark-doc` / `lark-wiki` / `lark-note` | Markdown 与文档双向转换、段落增改、知识库目录与节点、思维笔记 |
+| 📁 **云空间 (Drive)** | `lark-drive` | 上传/下载/移动/删除、元数据检索、权限与外链、导入导出 |
+| 🧮 **电子表格 (Sheets)** | `lark-sheets` | 读写区域、公式计算、图表、透视与子表检测、数据分析脚本 |
+| 💬 **即时消息 (IM)** | `lark-im` | 个人/群消息收发、富文本与互动卡片、群成员管理 |
+| 📅 **日历与会议 (Calendar / VC)** | `lark-calendar` / `lark-meeting` / `lark-vc` | 日程排期、忙闲检索、会议室预订、会议控制、周期性日程 |
+| 🎙️ **妙记 (Minutes)** | `lark-minutes` / `lark-workflow-meeting-summary` | 逐字稿提取、纪要提炼、会议纪要工作流 |
+| 📧 **邮箱 (Mail)** | `lark-mail` | 邮件草稿与发送、模板化周报/外部沟通 |
+| ✅ **任务与审批 (Task / Approval)** | `lark-task` / `lark-approval` | 待办与子任务、发起原生审批单、审批待办/已办、实例详情 |
+| 🕒 **考勤 (Attendance)** | `lark-attendance` | 个人出勤打卡记录查询与工时统计 |
+| 🎯 **目标 (OKR)** | `lark-okr` | OKR 周期、目标与关键结果查询维护 |
+| 👥 **通讯录 (Contact)** | `lark-contact` | 用户与机器人检索、身份解析 |
+| 🖼️ **幻灯片与白板 (Slides / Whiteboard)** | `lark-slides` / `lark-whiteboard` | 幻灯片结构读写、白板/画板节点操作 |
+| 📝 **Markdown 与复合工作流** | `lark-markdown` / `lark-workflow-standup-report` | Markdown 互转、站会/周报等复合流程 |
+| 🛠️ **妙搭与开放能力** | `lark-apps` / `lark-openapi-explorer` / `lark-skill-maker` | 妙搭应用开发与部署、探索原生 OpenAPI、按官方约定扩展新技能 |
+| 🔔 **事件与共享规则** | `lark-event` / `lark-shared` | 事件订阅/回调、身份与 scope 的共享规则 |
 
 ---
 
@@ -52,7 +67,7 @@
 
 ## 🖥️ 支持平台与系统
 
-Windows、macOS 与 Linux。安装脚本见 [install.ps1](scripts/install.ps1) / [install.sh](scripts/install.sh)，许可证为 [MIT](LICENSE)。
+Windows、macOS 与 Linux。Codex 安装脚本见 [install.ps1](scripts/install.ps1) / [install.sh](scripts/install.sh)；DSH 桌面端安装脚本见 [install-dsh.ps1](scripts/install-dsh.ps1)。许可证为 [MIT](LICENSE)。
 
 ---
 
@@ -110,6 +125,22 @@ cd codex-feishu-plugin
 
 ---
 
+### 方式三：装进桌面端 DeepSeek Harness（DSH）
+
+DSH 桌面端由 Electron 独占管理 profile，安装脚本会复制 bundle、链接依赖、在 `dsh.profile.bundles` 里选中它，并运行 `pnpm install`：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dsh.ps1
+```
+
+脚本默认安装到 `desktop` profile，并在修改 `package.json` 前保留时间戳备份。完成后**重启 DSH 桌面端**，`feishu-workflow-router` 与 `feishu-setup` 会出现在会话技能目录里。卸载：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\uninstall-dsh.ps1
+```
+
+参数（`-ProfileName`、`-DshHome`、`-SkipInstall`、`-DryRun`）与 bundle 结构见 [DSH bundle 说明](plugins/dsh-feishu/README.md)。
+
 ## 🔑 首次配置与飞书授权
 
 安装完成后，只需三步即可激活飞书权限：
@@ -133,13 +164,13 @@ lark-cli auth status --json --verify
 lark-cli whoami
 ```
 
-已安装的 1.0.93 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。更完整的机器部署、OAuth 边界和验证步骤见 [部署指南](docs/deployment.md)。
+已安装的 1.0.98 版本中，`lark-cli whoami` 不带额外 JSON flag 也会输出 JSON；升级后必须以当前运行时帮助为准。更完整的机器部署、OAuth 边界和验证步骤见 [部署指南](docs/deployment.md)。
 
 ---
 
 ## 💬 日常对话指令示例
 
-插件技能默认不注入系统提示。用时先显式唤起 `$codex-feishu:feishu-workflow-router`（安装/登录用 `$codex-feishu:feishu-setup`），再下达指令：
+插件技能默认不注入系统提示。Codex 构建里用时先显式唤起 `$codex-feishu:feishu-workflow-router`（安装/登录用 `$codex-feishu:feishu-setup`），再下达指令；DSH 构建由模型按技能描述自动选择同名的两个技能：
 
 * **多维表格数据分析**：
   > “读取这个多维表格，统计本周各负责人的未完成工单分布，只读分析不要改写数据：`<粘贴飞书 Base 链接>`”
