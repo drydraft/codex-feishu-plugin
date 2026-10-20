@@ -28,6 +28,8 @@ Copy-Item -Recurse .\plugins\dsh-feishu "$env:USERPROFILE\.dsh\local-plugins\dsh
 
 仓库根目录的 `scripts/install-dsh.ps1` 会自动完成第 2–4 步并保留备份。
 
+不想重启也能用：把 `~/.dsh/skills/<skill>` 建成指向 bundle `skills/<skill>` 的目录联接（Windows Junction），Watcher 会在数秒内把技能加入当前会话目录；重启后 bundle 的运行时注册优先，同名同内容。
+
 ## 技能
 
 | 技能 | 用途 |

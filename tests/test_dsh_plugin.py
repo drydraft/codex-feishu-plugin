@@ -333,6 +333,11 @@ class DshScriptTests(unittest.TestCase):
         self.assertIn("pnpm install", installer)
         self.assertIn("local-plugins", installer)
         self.assertIn("Restart the DeepSeek Harness desktop app", installer)
+        # Every direct invocation must supply the bundle package; the helper
+        # refuses to guess which package to link.
+        for line in installer.splitlines():
+            if "& node" in line and "apply-dsh-profile.mjs" in line:
+                self.assertIn("--package", line, line)
 
     @unittest.skipUnless(POWERSHELL, "PowerShell is required")
     def test_powershell_scripts_parse(self):

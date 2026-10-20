@@ -71,7 +71,7 @@ if ($DryRun) {
     exit $LASTEXITCODE
 }
 
-& node (Join-Path $PSScriptRoot "apply-dsh-profile.mjs") "--profile" $profileDirectory "--dry-run" | Out-Null
+& node (Join-Path $PSScriptRoot "apply-dsh-profile.mjs") "--profile" $profileDirectory "--package" $source "--dry-run" | Out-Null
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $destination = Join-Path $DshHome "local-plugins\dsh-feishu"

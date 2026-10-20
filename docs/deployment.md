@@ -91,6 +91,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-dsh.ps1
 
 随后**重启 DSH 桌面端**。重启后会话技能目录里应出现 `feishu-workflow-router` 与 `feishu-setup`；业务命令仍由本机 `lark-cli` 执行，不需要在 DSH 里再配置一次凭据。
 
+如果不想立刻重启，可以在用户技能根目录放两个指向 bundle 的目录联接（Windows Junction）。Watcher 会在数秒内把技能加入当前会话目录，而且它们与 bundle 始终是同一份文件：
+
+```powershell
+New-Item -ItemType Junction -Path "$HOME\.dsh\skills\feishu-workflow-router" -Target "$HOME\.dsh\local-plugins\dsh-feishu\skills\feishu-workflow-router"
+New-Item -ItemType Junction -Path "$HOME\.dsh\skills\feishu-setup" -Target "$HOME\.dsh\local-plugins\dsh-feishu\skills\feishu-setup"
+```
+
+重启后 bundle 的运行时注册优先级更高，两者同名同内容，不会产生行为差异。
+
 常用参数：`-ProfileName <name>` 指定 profile，`-DryRun` 只打印计划，`-SkipInstall` 跳过 pnpm。回滚：
 
 ```powershell
